@@ -1,0 +1,15 @@
+# One prompt per line. Blank lines and lines starting with '#' are ignored.
+# Run a batch with:  python -m debate_harness.cli --batch prompts/sample_prompts.txt
+# These are deliberately varied and lean toward questions where two models can
+# genuinely disagree — the hard cases where a debate earns its keep (spec §13).
+
+Should a small startup building a new web app default to a monolith or microservices?
+Is it better to learn a language by building projects or by working through a structured course first?
+For a 30-year-old with a stable income, is paying off a 4% mortgage early better than investing the difference in an index fund?
+Should code reviews block a merge on style issues, or should style be left entirely to automated formatters?
+Is nuclear power a necessary part of decarbonizing the electricity grid, or can renewables plus storage do it alone?
+When writing tests, is it better to aim for high coverage of units or fewer, broader integration tests?
+Should a manager give direct critical feedback immediately, or wait for a scheduled one-on-one?
+Is it ethical to use AI-generated art commercially without disclosing that it was AI-generated?
+For long-term retention, is spaced repetition with flashcards better than re-reading and summarizing?
+Should a growing engineering team standardize on a single programming language, or let teams choose their own?
