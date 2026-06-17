@@ -83,6 +83,7 @@ Useful flags:
 | `--no-clarify` | Skip clarifying questions even in interactive mode. |
 | `--stages S1 S2 S3` | Turn counts per stage (default `3 3 2`). This is the **cooling-rate** knob (open question §2). |
 | `--judge-stop` | Let a *confident* judge read end the debate early (default: observe-only, turn-cap only). |
+| `--state-2to3` | Let the judge's read drive the **stage 2→3** transition instead of the timer (gradual + reversible + turn-capped; §7). Default off. |
 | `--same-model` | Run **both** slots on the Anthropic model — the sycophancy baseline (§9) to measure cross-model against. |
 | `--elaborations N` | Allow up to N orchestrator elaboration requests (default `0`). |
 

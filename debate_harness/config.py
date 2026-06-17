@@ -86,6 +86,16 @@ class Config:
     # the judge's consensus/circularity reads actually end the debate early.
     enable_judge_stop: bool = False
 
+    # --- State-based stage 2->3 transition (spec §7) -----------------------
+    # Off by default: the default keeps the pure turn-based timer, judge
+    # observe-only. When on, the judge's read drives the 2->3 boundary (1->2
+    # stays turn-based), with the safeguards below. The knobs only take effect
+    # when the gate is on, and are starting points to tune against transcripts.
+    state_based_2to3: bool = False
+    min_stage2_turns: int = 1  # min stage-2 turns before state can advance to 3
+    stage_transition_confidence: float = 0.6  # min judge confidence to act on a read
+    max_stage_reversals: int = 1  # cap on 3->2 reversions (anti-thrash)
+
     # --- Clarification -----------------------------------------------------
     # Interactive runs may ask the user clarifying questions before refining.
     # Batch runs never can, so they skip straight to refinement.

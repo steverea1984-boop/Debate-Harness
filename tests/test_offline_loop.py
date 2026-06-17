@@ -34,6 +34,12 @@ class StubProvider(Provider):
 
     vendor = "stub"
 
+    # The judge read this stub returns — overridable per subclass so tests can
+    # simulate different judge behavior without touching the loop.
+    JUDGE_PERCEIVED = "surface"
+    JUDGE_CONSENSUS = "disagreement"
+    JUDGE_CONFIDENCE = 0.3
+
     def __init__(self, model: str):
         super().__init__(model)
         self._n = 0
@@ -54,10 +60,10 @@ class StubProvider(Provider):
             return {"seed_slot": "A", "criteria": "clarity", "reasoning": "A is clearer"}
         if "perceived_stage" in props:  # judge
             return {
-                "perceived_stage": "surface",
-                "consensus_shape": "disagreement",
-                "confidence": 0.3,
-                "reason": "still arguing",
+                "perceived_stage": self.JUDGE_PERCEIVED,
+                "consensus_shape": self.JUDGE_CONSENSUS,
+                "confidence": self.JUDGE_CONFIDENCE,
+                "reason": "stub read",
                 "should_stop": False,
             }
         if "request_elaboration" in props:
@@ -72,11 +78,21 @@ class StubProvider(Provider):
         raise AssertionError(f"unexpected schema in complete_json: {sorted(props)}")
 
 
+class ResolvingStubProvider(StubProvider):
+    """A stub whose judge reads the debate as confidently resolving."""
+
+    JUDGE_PERCEIVED = "resolving"
+    JUDGE_CONSENSUS = "productive_stalemate"
+    JUDGE_CONFIDENCE = 0.9
+
+
 class OfflineLoopTest(unittest.TestCase):
     def setUp(self):
-        # Route all providers to the stub.
+        # Route all providers to the stub. provider_cls is swappable so a test
+        # can choose a different judge behavior.
+        self.provider_cls = StubProvider
         self._orig_make = orchestrator.make_provider
-        orchestrator.make_provider = lambda provider, model: StubProvider(model)
+        orchestrator.make_provider = lambda provider, model: self.provider_cls(model)
         self.addCleanup(setattr, orchestrator, "make_provider", self._orig_make)
 
         # Keep log artifacts out of the workspace.
@@ -130,6 +146,32 @@ class OfflineLoopTest(unittest.TestCase):
         # Log artifacts written.
         self.assertTrue((logger.dir / "run.json").exists(), "run.json written")
         self.assertTrue((logger.dir / "transcript.md").exists(), "transcript.md written")
+
+    def test_state_based_2to3_reaches_stage3_earlier(self):
+        # With the gate ON and a judge that reads "resolving", the loop should
+        # advance to stage 3 earlier than the pure timer would, and still stop at
+        # the turn cap. Schedule 2/2/1 (turn_cap=5); min_stage2_turns=1.
+        self.provider_cls = ResolvingStubProvider
+        cfg = Config()
+        cfg.stage1_turns, cfg.stage2_turns, cfg.stage3_turns = 2, 2, 1
+        cfg.state_based_2to3 = True
+        cfg.min_stage2_turns = 1
+        cfg.stage_transition_confidence = 0.6
+
+        logger = RunLogger(label="state-test")
+        orch = orchestrator.Orchestrator(cfg, logger)
+        result = orch.run("Should X or Y?", ask_user=None)
+
+        stages = [t.stage for t in result.transcript.turns]
+        # seed(1) + debate [1,1,2,3,3] — stage 3 reached at debate turn 4 vs the
+        # timer's turn 5 ([1,1,1,2,2,3]).
+        self.assertEqual(stages, [1, 1, 1, 2, 3, 3])
+        self.assertEqual(len(result.transcript.turns), 1 + cfg.turn_cap)
+        self.assertEqual(result.stop_reason, "turn_cap")
+
+        # A state-driven stage transition was logged.
+        kinds = [(e["kind"], e.get("reason")) for e in logger.record["events"]]
+        self.assertIn(("stage_transition", "state_advance"), kinds)
 
     def test_stage_schedule_pure(self):
         # Guard config.stage_for_turn independently of the loop.

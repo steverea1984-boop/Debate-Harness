@@ -16,6 +16,7 @@ from .config import Config, ORCHESTRATOR_DIR, ROLES_DIR, STAGE_NAMES
 from .judge import Judge, JudgeRead, TERMINAL_SHAPES
 from .logging_utils import RunLogger
 from .providers import Provider, make_provider
+from .stages import StageController
 from .transcript import Transcript, Turn
 
 
@@ -308,9 +309,10 @@ class Orchestrator:
         last_read: Optional[JudgeRead] = None
         elaborations_used = 0
         turns_since_elab = cfg.elaboration_cooldown  # allow from the start
+        controller = StageController(cfg)
 
         for debate_turn in range(1, cfg.turn_cap + 1):
-            stage = cfg.stage_for_turn(debate_turn)
+            stage = controller.current_stage(debate_turn)
             debater = self.debaters[current]
             instruction = (
                 "Respond to the other debater's most recent turn in the shared "
@@ -366,6 +368,24 @@ class Orchestrator:
                 f"`{read.perceived_stage}` | consensus = `{read.consensus_shape}` "
                 f"| confidence = {read.confidence:.2f}\n>\n> {read.reason}\n"
             )
+
+            # Stage management. In the default (timer) mode this never transitions
+            # off-schedule; in state mode the judge's read can drive the 2->3
+            # boundary (and step back). Either way, log every stage decision.
+            controller.observe(debate_turn, read)
+            if controller.last_transition:
+                t = controller.last_transition
+                self.log.event(
+                    "stage_transition",
+                    after_turn=debate_turn,
+                    from_stage=t["from"],
+                    to_stage=t["to"],
+                    reason=t["reason"],
+                )
+                self.log.md(
+                    f"> **Stage transition:** {t['from']} → {t['to']} "
+                    f"(`{t['reason']}`)\n"
+                )
 
             # The judge only stops the debate if explicitly enabled (§13).
             if (
