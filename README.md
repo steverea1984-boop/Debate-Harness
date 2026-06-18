@@ -51,17 +51,40 @@ Set credentials (env vars or `.env`):
 
 - `ANTHROPIC_API_KEY` — required (Anthropic debater slot + orchestrator + judge).
 - `OPENAI_API_KEY` — required (OpenAI debater slot).
+- `OPENROUTER_API_KEY` — optional; one key to reach many vendors via OpenRouter.
 
 By default the two debaters are **different vendors** (spec §9 — cross-model
 addresses both sycophancy *and* shared blind spots):
 
-| Slot | Provider  | Default model        | Role      | Env override        |
-|------|-----------|----------------------|-----------|---------------------|
-| A    | Anthropic | `claude-opus-4-8`    | proposer  | `ANTHROPIC_MODEL`   |
-| B    | OpenAI    | `gpt-4o`             | skeptic   | `OPENAI_MODEL`      |
+| Slot | Provider  | Default model        | Role      | Model env (legacy) |
+|------|-----------|----------------------|-----------|--------------------|
+| A    | Anthropic | `claude-opus-4-8`    | proposer  | `ANTHROPIC_MODEL`  |
+| B    | OpenAI    | `gpt-4o`             | skeptic   | `OPENAI_MODEL`     |
 
-The orchestrator and the observe-only judge run on Anthropic (`ORCHESTRATOR_MODEL`,
-default `claude-opus-4-8`).
+The orchestrator and the observe-only judge default to Anthropic
+(`ORCHESTRATOR_MODEL`, default `claude-opus-4-8`; the judge mirrors the
+orchestrator). Every endpoint's **provider and model** can be changed — including
+to OpenRouter — see [Choosing models / cost](#choosing-models--cost) below.
+
+### Choosing models / cost
+
+All four endpoints — **slot A, slot B, orchestrator, judge** — are independently
+selectable by `provider` + `model`. Provider is `anthropic`, `openai`, or
+`openrouter` (OpenAI-SDK-compatible; one key reaches Anthropic/OpenAI/Google/Llama/
+etc. as `vendor/model` slugs). Pick via env vars (`SLOT_A_PROVIDER`/`SLOT_A_MODEL`,
+`SLOT_B_*`, `ORCHESTRATOR_PROVIDER`, `JUDGE_PROVIDER`/`JUDGE_MODEL`) or CLI flags.
+**Defaults are unchanged**, and the **judge mirrors the orchestrator** unless set
+separately.
+
+Cost note: the judge runs after *every* turn, so it dominates per-debate calls.
+Routing it (and the orchestrator) to a cheap model is the biggest lever:
+
+```bash
+python -m debate_harness.cli --no-clarify \
+  --orchestrator openrouter:anthropic/claude-3.5-haiku \
+  --judge openrouter:anthropic/claude-3.5-haiku \
+  "Should a startup default to a monolith or microservices?"
+```
 
 ## Usage
 
@@ -86,6 +109,7 @@ Useful flags:
 | `--state-2to3` | Let the judge's read drive the **stage 2→3** transition instead of the timer (gradual + reversible + turn-capped; §7). Default off. |
 | `--circularity-stop` | Stop early when the debate is **structurally circular** — debaters restating themselves (§10). A cheap, no-AI lexical check; default off (observe-only, logged each turn). |
 | `--same-model` | Run **both** slots on the Anthropic model — the sycophancy baseline (§9) to measure cross-model against. |
+| `--slot-a` / `--slot-b` / `--orchestrator` / `--judge` | Override an endpoint's model as `PROVIDER:MODEL` (e.g. `--judge openrouter:anthropic/claude-3.5-haiku`). See **Choosing models / cost**. |
 | `--elaborations N` | Allow up to N orchestrator elaboration requests (default `0`). |
 
 Every run writes a timestamped directory under `logs/`:

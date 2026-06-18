@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 # Load .env if present (no-op if python-dotenv isn't installed).
 try:  # pragma: no cover - trivial
@@ -31,7 +31,7 @@ LOGS_DIR = ROOT / "logs"
 class SlotConfig:
     """One of the two debater slots."""
 
-    provider: str  # "anthropic" | "openai"
+    provider: str  # "anthropic" | "openai" | "openrouter"
     model: str
     role: str  # "proposer" | "skeptic"
 
@@ -41,25 +41,44 @@ class Config:
     # --- Debater slots -----------------------------------------------------
     # Default per spec §9: different models, complementary roles.
     # Slot A -> proposer (Anthropic), Slot B -> skeptic (OpenAI).
+    # Each endpoint's provider+model can be overridden by env (SLOT_A_PROVIDER /
+    # SLOT_A_MODEL, etc.); the legacy ANTHROPIC_MODEL / OPENAI_MODEL stay as the
+    # model fallback so existing setups are unchanged. CLI flags override env.
     slot_a: SlotConfig = field(
         default_factory=lambda: SlotConfig(
-            provider="anthropic",
-            model=os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8"),
+            provider=os.environ.get("SLOT_A_PROVIDER", "anthropic"),
+            model=os.environ.get(
+                "SLOT_A_MODEL", os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
+            ),
             role="proposer",
         )
     )
     slot_b: SlotConfig = field(
         default_factory=lambda: SlotConfig(
-            provider="openai",
-            model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
+            provider=os.environ.get("SLOT_B_PROVIDER", "openai"),
+            model=os.environ.get(
+                "SLOT_B_MODEL", os.environ.get("OPENAI_MODEL", "gpt-4o")
+            ),
             role="skeptic",
         )
     )
 
     # --- Orchestrator / observe-only judge ---------------------------------
-    orchestrator_provider: str = "anthropic"
+    orchestrator_provider: str = field(
+        default_factory=lambda: os.environ.get("ORCHESTRATOR_PROVIDER", "anthropic")
+    )
     orchestrator_model: str = field(
         default_factory=lambda: os.environ.get("ORCHESTRATOR_MODEL", "claude-opus-4-8")
+    )
+    # The judge is independently selectable; when unset it mirrors the
+    # orchestrator (today's behavior). Resolve via the effective_* properties so
+    # the fallback always reflects the *final* orchestrator value (e.g. after CLI
+    # overrides), regardless of assignment order.
+    judge_provider: Optional[str] = field(
+        default_factory=lambda: os.environ.get("JUDGE_PROVIDER")
+    )
+    judge_model: Optional[str] = field(
+        default_factory=lambda: os.environ.get("JUDGE_MODEL")
     )
 
     # --- Stage schedule (turn-based timer; spec §12) -----------------------
@@ -114,6 +133,16 @@ class Config:
     def turn_cap(self) -> int:
         return self.stage1_turns + self.stage2_turns + self.stage3_turns
 
+    @property
+    def effective_judge_provider(self) -> str:
+        """Judge provider, falling back to the orchestrator's when unset."""
+        return self.judge_provider or self.orchestrator_provider
+
+    @property
+    def effective_judge_model(self) -> str:
+        """Judge model, falling back to the orchestrator's when unset."""
+        return self.judge_model or self.orchestrator_model
+
     def stage_for_turn(self, debate_turn: int) -> int:
         """Map a 1-based debate turn index to its scheduled stage.
 
@@ -131,6 +160,10 @@ class Config:
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["turn_cap"] = self.turn_cap
+        # Record the *resolved* judge endpoint (not the None placeholder) so each
+        # run.json shows which model actually played the judge.
+        d["judge_provider"] = self.effective_judge_provider
+        d["judge_model"] = self.effective_judge_model
         return d
 
 
