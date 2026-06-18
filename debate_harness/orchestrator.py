@@ -180,7 +180,10 @@ class Orchestrator:
         data = self.orch.complete_json(
             self.system, user, _REFINE_SCHEMA, self.config.orchestrator_max_tokens
         )
-        refined = data.get("refined_prompt", raw_prompt)
+        # Fall back to the raw prompt if the orchestrator returns an empty (or
+        # missing) refined prompt — a weak orchestrator model can do this, and an
+        # empty question unmoors the whole debate into hallucination.
+        refined = (data.get("refined_prompt") or "").strip() or raw_prompt
         questions = data.get("clarifying_questions", []) or []
 
         if (
@@ -199,7 +202,7 @@ class Orchestrator:
             data2 = self.orch.complete_json(
                 self.system, user2, _REFINE_SCHEMA, self.config.orchestrator_max_tokens
             )
-            refined = data2.get("refined_prompt", refined)
+            refined = (data2.get("refined_prompt") or "").strip() or refined
             self.log.event(
                 "clarify", questions=questions, answers=answers, refined=refined
             )
