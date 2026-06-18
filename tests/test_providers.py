@@ -1,20 +1,21 @@
 """Offline tests for the provider layer.
 
-Guards the OpenAI call contract without touching the network: the chat
-completion must be requested with ``max_completion_tokens`` (the parameter the
-GPT-5 series requires; ``max_tokens`` is rejected with a 400 and is deprecated
-for chat completions generally). A fake client captures the kwargs.
+Guards the OpenAI call contract without touching the network *or requiring the
+openai SDK to be installed* (CI runs with no dependencies — stub providers only).
+A fake ``openai`` module is injected into ``sys.modules`` so the provider's lazy
+``from openai import OpenAI`` resolves to a capturing fake, letting us assert the
+request uses ``max_completion_tokens`` (required by the GPT-5 series; ``max_tokens``
+is rejected with a 400 and is deprecated for chat completions generally).
 
 Run locally with:  python -m unittest discover -s tests -v
 """
 
 from __future__ import annotations
 
-import os
+import sys
+import types
 import unittest
 from types import SimpleNamespace
-
-from debate_harness.providers import OpenAIProvider
 
 
 class _CapturingCompletions:
@@ -28,25 +29,30 @@ class _CapturingCompletions:
 
 
 class _FakeClient:
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.chat = SimpleNamespace(completions=_CapturingCompletions())
 
 
 class OpenAIProviderContractTest(unittest.TestCase):
     def setUp(self):
-        # OpenAI() reads the key from the env at construction (no network call).
-        self._had_key = "OPENAI_API_KEY" in os.environ
-        os.environ.setdefault("OPENAI_API_KEY", "sk-test-offline")
-        self.addCleanup(self._restore_key)
+        # Inject a fake `openai` module so OpenAIProvider's lazy import resolves
+        # with no SDK installed and no network. Restored after the test.
+        self._orig = sys.modules.get("openai")
+        fake = types.ModuleType("openai")
+        fake.OpenAI = _FakeClient
+        sys.modules["openai"] = fake
+        self.addCleanup(self._restore)
 
-    def _restore_key(self):
-        if not self._had_key:
-            os.environ.pop("OPENAI_API_KEY", None)
+    def _restore(self):
+        if self._orig is not None:
+            sys.modules["openai"] = self._orig
+        else:
+            sys.modules.pop("openai", None)
 
     def test_complete_uses_max_completion_tokens(self):
-        provider = OpenAIProvider("gpt-5.5")
-        provider._client = _FakeClient()  # swap real client for the capturing fake
+        from debate_harness.providers import OpenAIProvider
 
+        provider = OpenAIProvider("gpt-5.5")  # _client is our _FakeClient
         out = provider.complete("sys", [{"role": "user", "content": "hi"}], max_tokens=256)
 
         self.assertEqual(out, "hello")
