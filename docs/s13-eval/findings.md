@@ -54,15 +54,32 @@ lands softly / restates the conventional case**" and the **Claude** seed as
 The seed criterion explicitly rewards "a sharp, committed, contestable thesis"
 over "an exhaustive but hedged one."
 
-Two explanations remain entangled and **cannot be separated from this data**:
+Two explanations were initially entangled:
 - (a) Claude genuinely writes sharper, more debate-provoking openings, and the
   criterion correctly selects them; or
 - (b) the Claude orchestrator has a same-vendor stylistic affinity.
 
-This matters because "seed with the **stronger** answer" is then confounded with
-"seed with the **Claude** answer." **Decisive next probe: run with an OpenAI
-orchestrator.** If the seed flips to favouring gpt-5.5, it's orchestrator-vendor
-affinity (b); if it still favours Claude, it's a genuine style/criterion effect (a).
+**Resolved by the orchestrator probe (run 2026-06-18).** The same three prompts
+were re-run with the **orchestrator + judge switched to `gpt-5.5`**, debaters
+unchanged (Claude proposer vs gpt-5.5 skeptic). A gpt-5.5 referee **still seeded
+the Claude answer 3/3**, with the same rationale (Claude = "clearer, more
+argumentative thesis"; gpt-5.5 = "broader and more cautious"). A different-vendor
+referee — the one that would carry any same-vendor pull *toward* the gpt-5.5
+debater — agreeing rules out (b) and lands on **(a): Claude genuinely writes the
+sharper seed under this criterion, and the criterion selects it regardless of who
+judges.**
+
+| Orchestrator | Debaters | Claude answer seeded |
+|---|---|---|
+| Claude | cross (Claude = proposer) | 3/3 |
+| Claude | swap (Claude = **skeptic**) | 3/3 |
+| gpt-5.5 | cross (Claude = proposer) | 3/3 |
+
+The effect tracks the **Claude model** (seeded whether proposer or skeptic, and
+under either referee vendor), not the orchestrator's vendor or the slot. The seed
+criterion is behaving as designed — it selects for a sharp, contestable thesis,
+not for correctness — and Claude's opening style matches that criterion more often
+than gpt-5.5's. Still n = 3 prompts; a larger prompt set would firm this up.
 
 ### 2. The judge's consensus read is unstable early — `--judge-stop` would have misfired. (Q3)
 The CROSS-finance judge set `should_stop=True` with `genuine_consensus`
@@ -97,17 +114,19 @@ genuine-consensus-vs-capitulation human read.
 
 ## Caveats
 
-- **n = 3 per condition, one orchestrator vendor.** Signals, not conclusions —
-  especially the 6/6 seed result, which is striking but small.
-- Single schedule (3/3/2), single judge model, observe-only throughout.
+- **n = 3 per condition.** Signals, not conclusions — including the seed result,
+  which is consistent across referee vendors but still over only three prompts.
+- Single schedule (3/3/2), observe-only throughout. The orchestrator probe adds a
+  second referee vendor (gpt-5.5) but otherwise holds these fixed.
 
 ## Recommended next probes
 
-1. **OpenAI orchestrator** — the decisive test for finding 1 (vendor affinity vs.
-   genuine style). Highest value.
+1. ~~**OpenAI orchestrator**~~ — **done** (see finding 1): resolved finding 1 as a
+   genuine model-style effect, not orchestrator vendor-bias.
 2. **Harder / more prompts** where the two models should genuinely diverge, to
-   give finding 3 (cross vs. same) a fair test at the content level.
-3. **More n** before treating the seed-bias signal as established.
+   give finding 3 (cross vs. same) a fair test at the content level. Now the
+   highest-value open probe.
+3. **More n** before treating the seed result as established.
 
 _Reproduce: `python -m debate_harness.cli --no-clarify "<prompt>"` for CROSS;
 `--same-model` for SAME; SWAP needs a custom `Config` (OpenAI proposer / Anthropic
