@@ -40,13 +40,17 @@ class RunLogger:
     # --- human-readable transcript ----------------------------------------
     def md(self, text: str = "") -> None:
         self._md_lines.append(text)
-        (self.dir / "transcript.md").write_text("\n".join(self._md_lines))
+        (self.dir / "transcript.md").write_text(
+            "\n".join(self._md_lines), encoding="utf-8"
+        )
 
     def md_header(self, text: str, level: int = 2) -> None:
         self.md(f"\n{'#' * level} {text}\n")
 
     def _flush_json(self) -> None:
-        (self.dir / "run.json").write_text(json.dumps(self.record, indent=2))
+        (self.dir / "run.json").write_text(
+            json.dumps(self.record, indent=2), encoding="utf-8"
+        )
 
     def finalize(self, **summary: Any) -> Path:
         self.record["finished_at"] = datetime.now(timezone.utc).strftime(
