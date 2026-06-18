@@ -116,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(f"Batch file not found: {path}")
         prompts = [
             line.strip()
-            for line in path.read_text().splitlines()
+            for line in path.read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.strip().startswith("#")
         ]
         if not prompts:

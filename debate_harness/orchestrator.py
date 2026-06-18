@@ -25,7 +25,7 @@ from .transcript import Transcript, Turn
 # Role-file loading (spec §5: baseline + role overlay = the debater's system prompt)
 # ----------------------------------------------------------------------------
 def _read(path) -> str:
-    return path.read_text().strip()
+    return path.read_text(encoding="utf-8").strip()
 
 
 def build_debater_system(role: str) -> str:
