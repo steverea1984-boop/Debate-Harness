@@ -15,6 +15,7 @@ from typing import Any, Callable, Optional
 from .config import Config, ORCHESTRATOR_DIR, ROLES_DIR, STAGE_NAMES
 from .judge import Judge, JudgeRead, TERMINAL_SHAPES
 from .logging_utils import RunLogger
+from .circularity import CircularityDetector
 from .providers import Provider, make_provider
 from .stages import StageController
 from .transcript import Transcript, Turn
@@ -310,6 +311,7 @@ class Orchestrator:
         elaborations_used = 0
         turns_since_elab = cfg.elaboration_cooldown  # allow from the start
         controller = StageController(cfg)
+        detector = CircularityDetector(cfg)
 
         for debate_turn in range(1, cfg.turn_cap + 1):
             stage = controller.current_stage(debate_turn)
@@ -387,6 +389,22 @@ class Orchestrator:
                     f"(`{t['reason']}`)\n"
                 )
 
+            # Structural circularity check (observe-only; logged every turn).
+            cread = detector.read(transcript)
+            self.log.event(
+                "circularity_read",
+                after_turn=debate_turn,
+                evaluated=cread.evaluated,
+                scores=cread.pair_scores,
+                is_circular=cread.is_circular,
+            )
+            if cread.evaluated:
+                self.log.md(
+                    "> **Circularity (observe-only):** scores="
+                    f"{[round(s, 2) for s in cread.pair_scores]} "
+                    f"| circular = {cread.is_circular}\n"
+                )
+
             # The judge only stops the debate if explicitly enabled (§13).
             if (
                 cfg.enable_judge_stop
@@ -394,6 +412,11 @@ class Orchestrator:
                 and read.consensus_shape in TERMINAL_SHAPES
             ):
                 stop_reason = f"judge:{read.consensus_shape}"
+                break
+
+            # Circularity is a separate, opt-in backstop (spec §10).
+            if cfg.enable_circularity_stop and cread.is_circular:
+                stop_reason = "circular"
                 break
 
             current = "B" if current == "A" else "A"

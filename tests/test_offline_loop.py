@@ -86,6 +86,13 @@ class ResolvingStubProvider(StubProvider):
     JUDGE_CONFIDENCE = 0.9
 
 
+class RepeatingStubProvider(StubProvider):
+    """A stub whose debaters always say the same thing — a circular debate."""
+
+    def complete(self, system, messages, max_tokens):
+        return "We should pick the monolith; it is simpler and that point stands."
+
+
 class OfflineLoopTest(unittest.TestCase):
     def setUp(self):
         # Route all providers to the stub. provider_cls is swappable so a test
@@ -172,6 +179,43 @@ class OfflineLoopTest(unittest.TestCase):
         # A state-driven stage transition was logged.
         kinds = [(e["kind"], e.get("reason")) for e in logger.record["events"]]
         self.assertIn(("stage_transition", "state_advance"), kinds)
+
+    def test_circularity_stop_ends_debate_early(self):
+        # Debaters that repeat themselves -> structurally circular. With the gate
+        # on, the debate should stop early with stop_reason "circular".
+        self.provider_cls = RepeatingStubProvider
+        cfg = Config()
+        cfg.stage1_turns, cfg.stage2_turns, cfg.stage3_turns = 3, 3, 2  # turn_cap 8
+        cfg.enable_circularity_stop = True
+        cfg.circularity_min_turns = 4
+        cfg.circularity_threshold = 0.6
+
+        logger = RunLogger(label="circ-test")
+        orch = orchestrator.Orchestrator(cfg, logger)
+        result = orch.run("Monolith or microservices?", ask_user=None)
+
+        self.assertEqual(result.stop_reason, "circular")
+        self.assertLess(len(result.transcript.turns), 1 + cfg.turn_cap)
+        # Fires at debate turn 4: seed + 4 debate turns = 5 entries.
+        self.assertEqual(len(result.transcript.turns), 5)
+        kinds = [(e["kind"], e.get("is_circular")) for e in logger.record["events"]]
+        self.assertIn(("circularity_read", True), kinds)
+
+    def test_circularity_observe_only_by_default(self):
+        # Same repeating debaters, but gate OFF -> still runs to the turn cap,
+        # with the circular read logged (observe-only).
+        self.provider_cls = RepeatingStubProvider
+        cfg = Config()
+        cfg.stage1_turns, cfg.stage2_turns, cfg.stage3_turns = 2, 2, 1  # turn_cap 5
+
+        logger = RunLogger(label="circ-observe")
+        orch = orchestrator.Orchestrator(cfg, logger)
+        result = orch.run("Monolith or microservices?", ask_user=None)
+
+        self.assertEqual(result.stop_reason, "turn_cap")
+        self.assertEqual(len(result.transcript.turns), 1 + cfg.turn_cap)
+        kinds = [(e["kind"], e.get("is_circular")) for e in logger.record["events"]]
+        self.assertIn(("circularity_read", True), kinds)  # observed but not acted on
 
     def test_stage_schedule_pure(self):
         # Guard config.stage_for_turn independently of the loop.

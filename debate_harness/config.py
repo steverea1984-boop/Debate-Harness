@@ -96,6 +96,15 @@ class Config:
     stage_transition_confidence: float = 0.6  # min judge confidence to act on a read
     max_stage_reversals: int = 1  # cap on 3->2 reversions (anti-thrash)
 
+    # --- Circularity detection (spec §10) ----------------------------------
+    # Off by default: the structural detector still runs and logs every turn
+    # (observe-only), but only the turn cap stops the debate. When the gate is
+    # on, a circular read ends the debate early (stop_reason "circular"). Knobs
+    # only take effect for the verdict; the read is logged either way.
+    enable_circularity_stop: bool = False
+    circularity_threshold: float = 0.6  # min same-speaker similarity to count as restatement
+    circularity_min_turns: int = 4  # min debate turns before the detector can fire
+
     # --- Clarification -----------------------------------------------------
     # Interactive runs may ask the user clarifying questions before refining.
     # Batch runs never can, so they skip straight to refinement.
