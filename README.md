@@ -86,6 +86,22 @@ python -m debate_harness.cli --no-clarify \
   "Should a startup default to a monolith or microservices?"
 ```
 
+### Web UI
+
+A local web UI to compose debates (per-role model picker), watch them run live,
+read transcripts, and **compare two runs side by side** — handy for value-model
+comparison experiments.
+
+```bash
+pip install -r requirements-web.txt
+python -m debate_harness.web        # then open http://127.0.0.1:8000
+```
+
+It reuses the same engine and the incremental `run.json`/`transcript.md` logging
+(debates run on a background thread; the page polls for live progress). Tip: keep
+a capable model on the **orchestrator** (it refines, seeds, and presents) and on
+the **judge** — note that *thinking* models can truncate the judge's JSON.
+
 ## Usage
 
 ```bash

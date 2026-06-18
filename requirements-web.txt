@@ -1,0 +1,5 @@
+# Web UI extras (not needed for the core harness or the offline test suite).
+#   pip install -r requirements-web.txt
+#   python -m debate_harness.web
+fastapi>=0.110
+uvicorn>=0.29
