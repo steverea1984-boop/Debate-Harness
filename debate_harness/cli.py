@@ -16,6 +16,7 @@ Useful flags:
     --turn-cap-stages a b c  override stage1/stage2/stage3 turn counts
     --judge-stop           let a confident judge read end the debate early
     --state-2to3           let the judge's read drive the stage 2->3 transition
+    --circularity-stop     stop early if the debate is structurally going in circles
     --same-model           run both slots on the Anthropic model (sycophancy baseline)
 """
 
@@ -51,6 +52,8 @@ def _build_config(args: argparse.Namespace) -> Config:
         cfg.enable_judge_stop = True
     if args.state_2to3:
         cfg.state_based_2to3 = True
+    if args.circularity_stop:
+        cfg.enable_circularity_stop = True
     if args.elaborations is not None:
         cfg.max_elaborations = args.elaborations
     if args.stages is not None:
@@ -92,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-clarify", action="store_true", help="Never ask clarifying questions.")
     parser.add_argument("--judge-stop", action="store_true", help="Let the judge end the debate early.")
     parser.add_argument("--state-2to3", action="store_true", help="Let the judge's read drive the stage 2->3 transition (default: pure timer).")
+    parser.add_argument("--circularity-stop", action="store_true", help="Stop early if the debate is structurally circular (default: turn cap only).")
     parser.add_argument("--same-model", action="store_true", help="Run both slots on the Anthropic model (baseline).")
     parser.add_argument("--elaborations", type=int, default=None, help="Max orchestrator elaboration requests (default 0).")
     parser.add_argument(
