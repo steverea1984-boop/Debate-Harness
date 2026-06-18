@@ -109,6 +109,42 @@ class OpenRouterProviderContractTest(unittest.TestCase):
             OpenRouterProvider("anthropic/claude-3.5-haiku")
 
 
+class CompleteJsonRetryTest(unittest.TestCase):
+    """The in-prompt JSON path retries past a bad (truncated/garbage) response."""
+
+    def _provider(self, responses):
+        from debate_harness.providers import Provider
+
+        class _Scripted(Provider):
+            vendor = "scripted"
+
+            def __init__(self):
+                super().__init__("m")
+                self.calls = 0
+                self._responses = list(responses)
+
+            def complete(self, system, messages, max_tokens):
+                r = self._responses[min(self.calls, len(self._responses) - 1)]
+                self.calls += 1
+                return r
+
+        return _Scripted()
+
+    def test_retries_then_succeeds(self):
+        p = self._provider(['{"needs_clarclar truncated...', '{"ok": true}'])
+        out = p.complete_json("sys", "user", {"type": "object"}, 100)
+        self.assertEqual(out, {"ok": True})
+        self.assertEqual(p.calls, 2)  # first failed, second parsed
+
+    def test_raises_after_exhausting_retries(self):
+        from debate_harness.providers import ProviderError, JSON_RETRIES
+
+        p = self._provider(["not json at all"])  # every attempt fails
+        with self.assertRaises(ProviderError):
+            p.complete_json("sys", "user", {"type": "object"}, 100)
+        self.assertEqual(p.calls, JSON_RETRIES)
+
+
 class MakeProviderTest(unittest.TestCase):
     def setUp(self):
         self._orig = sys.modules.get("openai")
