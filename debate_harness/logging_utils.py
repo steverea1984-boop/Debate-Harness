@@ -9,6 +9,7 @@ Each run gets its own timestamped directory under ``logs/`` containing:
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,7 +21,10 @@ class RunLogger:
     def __init__(self, label: str = "run"):
         ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in label)[:40]
-        self.dir = LOGS_DIR / f"{ts}-{safe}"
+        # Short random suffix so two runs started in the same second with the same
+        # label (e.g. the same prompt across models in a comparison sweep) get
+        # distinct directories instead of interleaving into one.
+        self.dir = LOGS_DIR / f"{ts}-{safe}-{uuid.uuid4().hex[:4]}"
         self.dir.mkdir(parents=True, exist_ok=True)
         self.record: dict[str, Any] = {
             "started_at": ts,

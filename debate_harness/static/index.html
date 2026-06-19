@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Debate Harness</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --fg:#e6e9ef; --mut:#9aa3b2; --acc:#6ea8fe; --good:#4ade80; --warn:#fbbf24; --bad:#f87171;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:16px; }
+  header h1 { font-size:16px; margin:0; font-weight:600; }
+  nav button { background:none; border:none; color:var(--mut); font:inherit; cursor:pointer; padding:6px 10px; border-radius:6px; }
+  nav button.active { color:var(--fg); background:var(--panel2); }
+  main { max-width:1100px; margin:0 auto; padding:20px; }
+  .tab { display:none; } .tab.active { display:block; }
+  label { display:block; color:var(--mut); font-size:12px; margin:10px 0 4px; }
+  textarea, select, input { width:100%; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:8px; font:inherit; }
+  textarea { min-height:70px; resize:vertical; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .row > div { flex:1; min-width:220px; }
+  .stages { display:flex; gap:8px; } .stages input { width:60px; }
+  .gates { display:flex; gap:16px; flex-wrap:wrap; margin-top:8px; }
+  .gates label { display:flex; align-items:center; gap:6px; margin:0; color:var(--fg); }
+  .gates input { width:auto; }
+  button.primary { background:var(--acc); color:#06121f; border:none; border-radius:6px; padding:10px 18px; font-weight:600; cursor:pointer; margin-top:14px; }
+  button.primary:disabled { opacity:.5; cursor:default; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; margin-top:16px; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; }
+  .badge.running { background:#1e2a3a; color:var(--acc); } .badge.done { background:#12301f; color:var(--good); }
+  .badge.error { background:#3a1414; color:var(--bad); } .badge.unknown { background:#2a2f3a; color:var(--mut); }
+  .meta { color:var(--mut); font-size:12px; }
+  .grid2 { display:grid; grid-template-columns:1fr 320px; gap:16px; } @media(max-width:820px){ .grid2{ grid-template-columns:1fr; } }
+  .doc h1{font-size:18px;} .doc h2{font-size:15px; color:var(--acc); margin-top:18px;} .doc h3{font-size:13px; color:var(--mut);}
+  .doc p{margin:8px 0; white-space:pre-wrap;} .doc strong{color:#fff;}
+  .judges { font-size:12px; }
+  .judges .jr { border-bottom:1px solid var(--line); padding:6px 0; }
+  .chip { font-size:11px; padding:1px 6px; border-radius:4px; background:var(--panel2); }
+  .c-disagreement{color:var(--warn);} .c-genuine_consensus{color:var(--good);} .c-productive_stalemate{color:var(--acc);}
+  .c-capitulation{color:var(--bad);} .c-circular{color:var(--bad);}
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:8px; border-bottom:1px solid var(--line); }
+  tr.clickable:hover { background:var(--panel2); cursor:pointer; }
+  code { background:var(--panel2); padding:1px 5px; border-radius:4px; font-size:12px; }
+  .models-line { font-size:12px; color:var(--mut); margin:4px 0; }
+  .cmp { display:grid; grid-template-columns:1fr 1fr; gap:16px; } @media(max-width:820px){ .cmp{ grid-template-columns:1fr; } }
+  .err { color:var(--bad); }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚖️ Debate Harness</h1>
+  <nav>
+    <button data-tab="compose" class="active">Compose</button>
+    <button data-tab="runs">Runs</button>
+    <button data-tab="compare">Compare</button>
+  </nav>
+</header>
+<main>
+  <!-- COMPOSE -->
+  <section id="compose" class="tab active">
+    <label>Prompt</label>
+    <textarea id="prompt" placeholder="e.g. Should a startup default to a monolith or microservices?"></textarea>
+    <div class="row">
+      <div><label>Proposer (slot A)</label><select id="slot_a"></select></div>
+      <div><label>Skeptic (slot B)</label><select id="slot_b"></select></div>
+    </div>
+    <div class="row">
+      <div><label>Orchestrator</label><select id="orchestrator"></select></div>
+      <div><label>Judge <span class="meta">(default: same as orchestrator)</span></label><select id="judge"></select></div>
+    </div>
+    <div class="meta" style="margin-top:4px">Orchestrator/judge lists show only referee-safe models (they must emit clean JSON). Any catalog model can be a debater.</div>
+    <label>Stages (turns per stage — the cooling rate)</label>
+    <div class="stages">
+      <input id="s1" type="number" min="0" value="3" />
+      <input id="s2" type="number" min="0" value="3" />
+      <input id="s3" type="number" min="0" value="2" />
+    </div>
+    <button class="primary" id="run">Run debate</button>
+    <span id="composeErr" class="err"></span>
+    <div id="liveRun"></div>
+  </section>
+
+  <!-- RUNS -->
+  <section id="runs" class="tab">
+    <button class="primary" id="refreshRuns" style="margin-bottom:8px">Refresh</button>
+    <div id="runsList"></div>
+    <div id="runDetail"></div>
+  </section>
+
+  <!-- COMPARE -->
+  <section id="compare" class="tab">
+    <div class="row">
+      <div><label>Run A</label><select id="cmpA"></select></div>
+      <div><label>Run B</label><select id="cmpB"></select></div>
+    </div>
+    <div id="cmpOut"></div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => (s||"").replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+async function jget(u){ const r=await fetch(u); if(!r.ok) throw new Error((await r.json()).detail||r.status); return r.json(); }
+
+// minimal markdown -> html (headers, bold, paragraphs) for transcript.md
+function md(t){
+  const out=[];
+  for(const block of (t||"").split(/\n{2,}/)){
+    const b=block.trim(); if(!b){continue;}
+    let m;
+    if(m=b.match(/^(#{1,3})\s+(.*)$/s)){ const n=m[1].length; out.push(`<h${n}>${esc(m[2])}</h${n}>`); continue; }
+    out.push(`<p>${esc(b).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}</p>`);
+  }
+  return out.join("\n");
+}
+
+// ---- model pickers ----
+let MODELS=[];
+async function loadModels(){
+  MODELS=(await jget("/api/models")).models;
+  const opt = m => `<option value="${m.value}">${esc(m.label)} — ${m.tier} ($${m.price_in}/$${m.price_out})</option>`;
+  for(const id of ["slot_a","slot_b","orchestrator","judge"]){
+    // The orchestrator/judge must emit clean JSON; offer only referee-safe models
+    // there. Debaters (slot A/B) can be anything in the catalog.
+    const refereeRole = (id==="orchestrator" || id==="judge");
+    const list = refereeRole ? MODELS.filter(m=>m.referee_ok) : MODELS;
+    $("#"+id).innerHTML = `<option value="">(default)</option>` + list.map(opt).join("");
+  }
+}
+
+// ---- start a debate ----
+async function startRun(){
+  $("#composeErr").textContent="";
+  const body={
+    prompt: $("#prompt").value,
+    slot_a: $("#slot_a").value || undefined,
+    slot_b: $("#slot_b").value || undefined,
+    orchestrator: $("#orchestrator").value || undefined,
+    judge: $("#judge").value || undefined,
+    stages: [ +$("#s1").value, +$("#s2").value, +$("#s3").value ],
+  };
+  $("#run").disabled=true;
+  try{
+    const r=await fetch("/api/runs",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    if(!r.ok){ throw new Error((await r.json()).detail||r.status); }
+    const {id}=await r.json();
+    pollRun(id, $("#liveRun"));
+  }catch(e){
+    // A network/TypeError here almost always means the server isn't running.
+    const net = (e instanceof TypeError) || /failed to fetch/i.test(e.message||"");
+    $("#composeErr").textContent = net
+      ? " Can't reach the server — is it running? Start it with:  python -m debate_harness.web"
+      : " " + e.message;
+  }
+  finally{ $("#run").disabled=false; }
+}
+
+function judgesPanel(rec){
+  const reads=(rec.events||[]).filter(e=>e.kind==="judge_read");
+  if(!reads.length) return "";
+  return `<div class="panel"><strong>Judge reads (observe-only)</strong><div class="judges">`+
+    reads.map((j,i)=>`<div class="jr">t${i+1}: <span class="chip">${j.perceived_stage}</span>
+      <span class="c-${j.consensus_shape}">${j.consensus_shape}</span>
+      <span class="meta">conf ${j.confidence}${j.should_stop?" · stop":""}</span></div>`).join("")+
+    `</div></div>`;
+}
+function modelsLine(rec){
+  const c=rec.config||{};
+  const sa=c.slot_a||{}, sb=c.slot_b||{};
+  return `<div class="models-line">proposer <code>${sa.provider}:${sa.model}</code> · skeptic <code>${sb.provider}:${sb.model}</code>
+   · orch <code>${c.orchestrator_provider}:${c.orchestrator_model}</code> · judge <code>${c.judge_provider}:${c.judge_model}</code></div>`;
+}
+
+function renderRun(data, el){
+  const rec=data.record||{};
+  const badge=`<span class="badge ${data.status}">${data.status}</span>`;
+  el.innerHTML = `<div class="panel">
+      <div>${badge} <span class="meta">${data.id}</span></div>
+      ${modelsLine(rec)}
+    </div>
+    <div class="grid2">
+      <div class="panel doc">${md(data.transcript) || '<p class="meta">waiting for the first turn…</p>'}</div>
+      <div>${judgesPanel(rec)}</div>
+    </div>`;
+}
+
+async function pollRun(id, el){
+  el.innerHTML=`<div class="panel"><span class="badge running">running</span> <span class="meta">${id}</span></div>`;
+  while(true){
+    let data; try{ data=await jget("/api/runs/"+id); }catch(e){ await sleep(1500); continue; }
+    renderRun(data, el);
+    if(data.status!=="running") break;
+    await sleep(2000);
+  }
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+// ---- runs list ----
+async function loadRuns(){
+  const {runs}=await jget("/api/runs");
+  $("#runsList").innerHTML = `<table><thead><tr><th>When</th><th>Prompt</th><th>Proposer ✕ Skeptic</th><th>Outcome</th><th>Status</th></tr></thead><tbody>`+
+    runs.map(r=>`<tr class="clickable" data-id="${r.id}">
+      <td class="meta">${r.started_at||""}</td>
+      <td>${esc((r.prompt||"").slice(0,70))}</td>
+      <td class="meta">${esc(r.models.proposer)} ✕ ${esc(r.models.skeptic)}</td>
+      <td>${r.outcome?`<span class="c-${r.outcome}">${r.outcome}</span>`:'<span class="meta">—</span>'}</td>
+      <td><span class="badge ${r.status}">${r.status}</span></td></tr>`).join("")+
+    `</tbody></table>`;
+  $("#runsList").querySelectorAll("tr.clickable").forEach(tr=>tr.onclick=async()=>{
+    const data=await jget("/api/runs/"+tr.dataset.id); renderRun(data, $("#runDetail"));
+    $("#runDetail").scrollIntoView({behavior:"smooth"});
+  });
+  return runs;
+}
+
+// ---- compare ----
+async function loadCompare(){
+  const runs=await jget("/api/runs").then(r=>r.runs);
+  const opts=`<option value="">—</option>`+runs.map(r=>`<option value="${r.id}">${esc((r.prompt||r.id).slice(0,50))} · ${esc(r.models.proposer)}✕${esc(r.models.skeptic)}</option>`).join("");
+  $("#cmpA").innerHTML=opts; $("#cmpB").innerHTML=opts;
+}
+function cmpCard(data){
+  if(!data) return `<div class="panel meta">pick a run</div>`;
+  const rec=data.record||{};
+  const pres=(rec.events||[]).filter(e=>e.kind==="present").slice(-1)[0]||{};
+  const traj=(rec.events||[]).filter(e=>e.kind==="judge_read").map(j=>j.consensus_shape[0]==="g"?"C":j.consensus_shape[0]==="p"?"S":j.consensus_shape[0]==="c"?"X":"d").join(" ");
+  return `<div class="panel doc">
+    <div>${modelsLine(rec)}</div>
+    <p><strong>Outcome:</strong> <span class="c-${pres.outcome_type||rec.summary?.outcome_type}">${pres.outcome_type||rec.summary?.outcome_type||"—"}</span></p>
+    <p class="meta">judge consensus trajectory: ${traj||"—"}</p>
+    <h3>Final answer</h3><p>${esc((pres.final_answer||"").slice(0,1600))}</p>
+    ${pres.residual_disagreement?`<h3>Residual</h3><p>${esc(pres.residual_disagreement.slice(0,800))}</p>`:""}
+  </div>`;
+}
+async function renderCompare(){
+  const a=$("#cmpA").value, b=$("#cmpB").value;
+  const da=a?await jget("/api/runs/"+a):null, db=b?await jget("/api/runs/"+b):null;
+  $("#cmpOut").innerHTML=`<div class="cmp">${cmpCard(da)}${cmpCard(db)}</div>`;
+}
+
+// ---- tabs ----
+document.querySelectorAll("nav button").forEach(btn=>btn.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  btn.classList.add("active"); $("#"+btn.dataset.tab).classList.add("active");
+  if(btn.dataset.tab==="runs") loadRuns();
+  if(btn.dataset.tab==="compare") loadCompare();
+});
+$("#run").onclick=startRun;
+$("#refreshRuns").onclick=loadRuns;
+$("#cmpA").onchange=renderCompare; $("#cmpB").onchange=renderCompare;
+loadModels();
+</script>
+</body>
+</html>
