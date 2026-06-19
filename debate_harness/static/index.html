@@ -78,11 +78,6 @@
       <input id="s2" type="number" min="0" value="3" />
       <input id="s3" type="number" min="0" value="2" />
     </div>
-    <div class="gates">
-      <label><input type="checkbox" id="judge_stop" /> judge-stop</label>
-      <label><input type="checkbox" id="state_2to3" /> state 2→3</label>
-      <label><input type="checkbox" id="circularity_stop" /> circularity-stop</label>
-    </div>
     <button class="primary" id="run">Run debate</button>
     <span id="composeErr" class="err"></span>
     <div id="liveRun"></div>
@@ -143,9 +138,6 @@ async function startRun(){
     orchestrator: $("#orchestrator").value || undefined,
     judge: $("#judge").value || undefined,
     stages: [ +$("#s1").value, +$("#s2").value, +$("#s3").value ],
-    judge_stop: $("#judge_stop").checked,
-    state_2to3: $("#state_2to3").checked,
-    circularity_stop: $("#circularity_stop").checked,
   };
   $("#run").disabled=true;
   try{
@@ -153,7 +145,13 @@ async function startRun(){
     if(!r.ok){ throw new Error((await r.json()).detail||r.status); }
     const {id}=await r.json();
     pollRun(id, $("#liveRun"));
-  }catch(e){ $("#composeErr").textContent=" "+e.message; }
+  }catch(e){
+    // A network/TypeError here almost always means the server isn't running.
+    const net = (e instanceof TypeError) || /failed to fetch/i.test(e.message||"");
+    $("#composeErr").textContent = net
+      ? " Can't reach the server — is it running? Start it with:  python -m debate_harness.web"
+      : " " + e.message;
+  }
   finally{ $("#run").disabled=false; }
 }
 
