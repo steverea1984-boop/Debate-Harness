@@ -72,6 +72,7 @@
       <div><label>Orchestrator</label><select id="orchestrator"></select></div>
       <div><label>Judge <span class="meta">(default: same as orchestrator)</span></label><select id="judge"></select></div>
     </div>
+    <div class="meta" style="margin-top:4px">Orchestrator/judge lists show only referee-safe models (they must emit clean JSON). Any catalog model can be a debater.</div>
     <label>Stages (turns per stage — the cooling rate)</label>
     <div class="stages">
       <input id="s1" type="number" min="0" value="3" />
@@ -121,10 +122,13 @@ function md(t){
 let MODELS=[];
 async function loadModels(){
   MODELS=(await jget("/api/models")).models;
+  const opt = m => `<option value="${m.value}">${esc(m.label)} — ${m.tier} ($${m.price_in}/$${m.price_out})</option>`;
   for(const id of ["slot_a","slot_b","orchestrator","judge"]){
-    const sel=$("#"+id);
-    sel.innerHTML = `<option value="">(default)</option>` + MODELS.map(m=>
-      `<option value="${m.value}">${esc(m.label)} — ${m.tier} ($${m.price_in}/$${m.price_out})</option>`).join("");
+    // The orchestrator/judge must emit clean JSON; offer only referee-safe models
+    // there. Debaters (slot A/B) can be anything in the catalog.
+    const refereeRole = (id==="orchestrator" || id==="judge");
+    const list = refereeRole ? MODELS.filter(m=>m.referee_ok) : MODELS;
+    $("#"+id).innerHTML = `<option value="">(default)</option>` + list.map(opt).join("");
   }
 }
 

@@ -33,10 +33,13 @@ class CatalogTest(unittest.TestCase):
         self.assertIn("value", tiers)
         self.assertIn("premium", tiers)
         for m in cat:
-            for key in ("value", "label", "vendor", "tier", "price_in", "price_out"):
+            for key in ("value", "label", "vendor", "tier", "price_in", "price_out", "referee_ok"):
                 self.assertIn(key, m)
             provider, sep, model = m["value"].partition(":")
             self.assertTrue(sep and provider and model, m["value"])  # parseable endpoint
+        # Catalog distinguishes referee-safe models from debater-only ones.
+        self.assertTrue(any(m["referee_ok"] for m in cat))
+        self.assertTrue(any(not m["referee_ok"] for m in cat))
 
 
 class ParseEndpointTest(unittest.TestCase):
