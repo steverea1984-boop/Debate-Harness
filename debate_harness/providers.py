@@ -121,12 +121,47 @@ class OpenAIProvider(Provider):
         return (resp.choices[0].message.content or "").strip()
 
 
+class OpenRouterProvider(OpenAIProvider):
+    """Any OpenRouter-hosted model via the OpenAI-compatible endpoint.
+
+    Same SDK as ``OpenAIProvider``, pointed at OpenRouter's base URL with the
+    ``OPENROUTER_API_KEY``. Models are ``vendor/model`` slugs (e.g.
+    ``anthropic/claude-3.5-haiku``). Uses ``max_tokens`` — OpenRouter's documented
+    parameter, normalized per backend — and inherits the base in-prompt-JSON
+    ``complete_json`` (no native json_schema is assumed across routed models).
+    """
+
+    vendor = "openrouter"
+    BASE_URL = "https://openrouter.ai/api/v1"
+
+    def __init__(self, model: str):
+        Provider.__init__(self, model)  # skip OpenAIProvider's default client
+        from openai import OpenAI  # lazy import (offline/stub-safe)
+        import os
+
+        key = os.environ.get("OPENROUTER_API_KEY")
+        if not key:
+            raise ProviderError("OPENROUTER_API_KEY is not set")
+        self._client = OpenAI(base_url=self.BASE_URL, api_key=key)
+
+    def complete(self, system, messages, max_tokens):
+        full = [{"role": "system", "content": system}, *messages]
+        resp = self._client.chat.completions.create(
+            model=self.model,
+            messages=full,
+            max_tokens=max_tokens,
+        )
+        return (resp.choices[0].message.content or "").strip()
+
+
 def make_provider(provider: str, model: str) -> Provider:
     provider = provider.lower()
     if provider == "anthropic":
         return AnthropicProvider(model)
     if provider == "openai":
         return OpenAIProvider(model)
+    if provider == "openrouter":
+        return OpenRouterProvider(model)
     raise ProviderError(f"Unknown provider: {provider!r}")
 
 

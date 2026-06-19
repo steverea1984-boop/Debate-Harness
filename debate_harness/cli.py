@@ -18,6 +18,12 @@ Useful flags:
     --state-2to3           let the judge's read drive the stage 2->3 transition
     --circularity-stop     stop early if the debate is structurally going in circles
     --same-model           run both slots on the Anthropic model (sycophancy baseline)
+    --slot-a / --slot-b    override a debater's PROVIDER:MODEL
+    --orchestrator         override the orchestrator's PROVIDER:MODEL
+    --judge                override the judge's PROVIDER:MODEL (default: = orchestrator)
+
+Provider may be anthropic | openai | openrouter. OpenRouter models are vendor/model
+slugs, e.g. --judge openrouter:anthropic/claude-3.5-haiku (cheap every-turn judge).
 """
 
 from __future__ import annotations
@@ -29,6 +35,20 @@ from pathlib import Path
 from .config import Config, SlotConfig
 from .logging_utils import RunLogger
 from .orchestrator import Orchestrator
+
+
+def _endpoint(s: str) -> tuple[str, str]:
+    """Parse a ``PROVIDER:MODEL`` CLI value into ``(provider, model)``.
+
+    The ``:`` separator is unambiguous because provider names contain no ``:`` and
+    OpenRouter model slugs use ``/`` (e.g. ``openrouter:anthropic/claude-3.5-haiku``).
+    """
+    provider, sep, model = s.partition(":")
+    if not sep or not provider.strip() or not model.strip():
+        raise argparse.ArgumentTypeError(
+            f"expected PROVIDER:MODEL (e.g. openrouter:anthropic/claude-3.5-haiku), got {s!r}"
+        )
+    return provider.strip(), model.strip()
 
 
 def _ask_user(questions: list[str]) -> dict[str, str]:
@@ -64,6 +84,16 @@ def _build_config(args: argparse.Namespace) -> Config:
         cfg.slot_b = SlotConfig(
             provider="anthropic", model=cfg.slot_a.model, role=cfg.slot_b.role
         )
+    # Per-role provider:model overrides (applied after --same-model so an explicit
+    # slot flag wins). Each value is already a parsed (provider, model) tuple.
+    if args.slot_a:
+        cfg.slot_a = SlotConfig(args.slot_a[0], args.slot_a[1], cfg.slot_a.role)
+    if args.slot_b:
+        cfg.slot_b = SlotConfig(args.slot_b[0], args.slot_b[1], cfg.slot_b.role)
+    if args.orchestrator:
+        cfg.orchestrator_provider, cfg.orchestrator_model = args.orchestrator
+    if args.judge:
+        cfg.judge_provider, cfg.judge_model = args.judge
     return cfg
 
 
@@ -81,7 +111,7 @@ def _print_result(result) -> None:
     print(f"\nFull log: {result.log_dir}")
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="debate_harness",
         description="Run a staged, sequential debate between two models.",
@@ -97,6 +127,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--state-2to3", action="store_true", help="Let the judge's read drive the stage 2->3 transition (default: pure timer).")
     parser.add_argument("--circularity-stop", action="store_true", help="Stop early if the debate is structurally circular (default: turn cap only).")
     parser.add_argument("--same-model", action="store_true", help="Run both slots on the Anthropic model (baseline).")
+    parser.add_argument("--slot-a", type=_endpoint, metavar="PROVIDER:MODEL", help="Override slot A (proposer) provider+model.")
+    parser.add_argument("--slot-b", type=_endpoint, metavar="PROVIDER:MODEL", help="Override slot B (skeptic) provider+model.")
+    parser.add_argument("--orchestrator", type=_endpoint, metavar="PROVIDER:MODEL", help="Override the orchestrator provider+model.")
+    parser.add_argument("--judge", type=_endpoint, metavar="PROVIDER:MODEL", help="Override the judge provider+model (default: same as orchestrator). e.g. openrouter:anthropic/claude-3.5-haiku")
     parser.add_argument("--elaborations", type=int, default=None, help="Max orchestrator elaboration requests (default 0).")
     parser.add_argument(
         "--stages",
@@ -106,6 +140,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Turn counts for stage 1/2/3 (default 3 3 2).",
     )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
 
     cfg = _build_config(args)

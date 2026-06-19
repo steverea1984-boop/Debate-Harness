@@ -144,7 +144,13 @@ class Orchestrator:
         self.config = config
         self.system = _read(ORCHESTRATOR_DIR / "system.md")
         self.orch = make_provider(config.orchestrator_provider, config.orchestrator_model)
-        self.judge = Judge(self.orch, config.orchestrator_max_tokens)
+        # The judge has its own provider instance; by default it mirrors the
+        # orchestrator's provider+model, but it can be pointed at a cheaper model
+        # independently (the judge runs after every turn — the biggest cost lever).
+        self.judge = Judge(
+            make_provider(config.effective_judge_provider, config.effective_judge_model),
+            config.orchestrator_max_tokens,
+        )
         self.debaters = {
             "A": Debater(
                 "A",
