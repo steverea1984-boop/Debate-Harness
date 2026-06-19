@@ -19,6 +19,10 @@ class ProviderError(RuntimeError):
     pass
 
 
+# How many times the in-prompt JSON path tries before giving up (1 initial + retries).
+JSON_RETRIES = 3
+
+
 class Provider(ABC):
     """A thin wrapper around one model endpoint."""
 
@@ -51,17 +55,35 @@ class Provider(ABC):
     ) -> dict[str, Any]:
         """Return a parsed JSON object constrained to ``schema``.
 
-        Default implementation asks for JSON in-prompt and extracts the object.
+        Default implementation asks for JSON in-prompt and extracts the object,
+        retrying with a firmer instruction if the model returns prose, a
+        truncated object, or degenerate/repeated text. Many capable "value"
+        models occasionally botch in-prompt JSON; a single re-roll almost always
+        recovers, which keeps one bad response from aborting a whole debate.
         Providers with native structured-output support override this.
         """
-        instruction = (
+        base = (
             user
             + "\n\nRespond with a single JSON object matching this schema "
             + "(no prose, no code fences):\n"
             + json.dumps(schema)
         )
-        text = self.complete(system, [{"role": "user", "content": instruction}], max_tokens)
-        return _extract_json(text)
+        instruction = base
+        last_err: Exception | None = None
+        for attempt in range(JSON_RETRIES):
+            text = self.complete(system, [{"role": "user", "content": instruction}], max_tokens)
+            try:
+                return _extract_json(text)
+            except ProviderError as err:
+                last_err = err
+                # Firmer instruction on retry: minified, single line, short values
+                # (cuts truncation and repetition — the two common failure modes).
+                instruction = base + (
+                    "\n\nIMPORTANT: Output ONLY one minified JSON object on a single "
+                    "line — no markdown, no commentary, no repeated keys. Keep every "
+                    "string value short (one or two sentences)."
+                )
+        raise last_err if last_err else ProviderError("complete_json failed")
 
 
 class AnthropicProvider(Provider):

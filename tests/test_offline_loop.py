@@ -86,6 +86,16 @@ class ResolvingStubProvider(StubProvider):
     JUDGE_CONFIDENCE = 0.9
 
 
+class EmptyRefineStubProvider(StubProvider):
+    """A stub orchestrator that returns an empty refined prompt (a weak model)."""
+
+    def complete_json(self, system, user, schema, max_tokens):
+        data = super().complete_json(system, user, schema, max_tokens)
+        if "refined_prompt" in schema.get("properties", {}):
+            data["refined_prompt"] = ""  # weak orchestrator emits nothing useful
+        return data
+
+
 class RepeatingStubProvider(StubProvider):
     """A stub whose debaters always say the same thing — a circular debate."""
 
@@ -108,6 +118,17 @@ class OfflineLoopTest(unittest.TestCase):
         self._orig_logs = logging_utils.LOGS_DIR
         logging_utils.LOGS_DIR = Path(self._tmp.name)
         self.addCleanup(setattr, logging_utils, "LOGS_DIR", self._orig_logs)
+
+    def test_empty_refined_prompt_falls_back_to_raw(self):
+        # A weak orchestrator returns an empty refined prompt; the loop must fall
+        # back to the raw prompt rather than debate an empty question.
+        self.provider_cls = EmptyRefineStubProvider
+        cfg = Config()
+        cfg.stage1_turns, cfg.stage2_turns, cfg.stage3_turns = 1, 1, 1
+        logger = RunLogger(label="empty-refine")
+        orchestrator.Orchestrator(cfg, logger).run("Should X or Y?", ask_user=None)
+        refine_evt = next(e for e in logger.record["events"] if e["kind"] == "refine")
+        self.assertEqual(refine_evt["refined"], "Should X or Y?")
 
     def test_full_loop_invariants(self):
         cfg = Config()
