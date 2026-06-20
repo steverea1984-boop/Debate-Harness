@@ -7,6 +7,11 @@ _Run 2026-06-19. The first experiment to measure the project's actual goal:
 artifact of the synthesis step compressing the answer. With that step fixed
 (Round 2), **debate beats a single model.** Cross-vs-same is still a wash.
 
+_Raw artifacts (answers, judge verdicts + reasons, scripts, exact setup) are in
+[`repro/`](repro/) so every claim below is auditable. The present-step fix that
+produced the Round 2 flip is PR #13. This experiment was run at Steve's request to
+test the project's core goal (does debate beat a single model?)._
+
 ## The question
 
 The whole harness exists to test one hypothesis: does a **staged two-model debate

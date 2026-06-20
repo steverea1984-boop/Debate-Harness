@@ -1,0 +1,35 @@
+from debate_harness import config as _load_env  # noqa: importing config runs load_dotenv()
+import json, glob
+from collections import Counter
+--- re-running judge ---
+========================================================================
+Is nuclear power a necessary part of decarbonizing the elect
+  cross  vs single: single
+       why: Answer 2 is substantially better reasoned. It explicitly engages with the actual debate (necessary vs. sufficient), makes a calibrated disti
+  cross  vs same  : same
+       why: Answer 2 is better reasoned because it acknowledges genuine uncertainty and presents a more nuanced, calibrated position. It correctly ident
+  same   vs single: single
+       why: Answer 2 provides substantially more analytical depth, organizing the tradeoffs into clear categories (reliability, land use, costs, deploym
+========================================================================
+For a 30-year-old with a stable income, is paying off a 4% m
+  cross  vs single: SPLIT (cross then single)
+       why: Answer 1 is more tightly reasoned and better-calibrated. It correctly identifies that the core issue is not just the mathematical spread bet
+  cross  vs same  : same
+       why: Answer 2 is more decision-useful because it explicitly identifies three distinct paths (invest, prepay, hybrid) with concrete conditions for
+  same   vs single: single
+       why: Answer 2 is more comprehensive and decision-useful. It covers the key dimensions (expected returns, risk tolerance, liquidity, and tax consi
+========================================================================
+Should an early-stage startup default to a monolith or micro
+  cross  vs single: single
+       why: Answer 2 provides substantially more decision-useful content: it explains *why* each factor matters (not just lists them), offers a concrete
+  cross  vs same  : same
+       why: Answer 2 provides a more comprehensive and nuanced treatment of the decision. While both answers correctly recommend a modular monolith as t
+  same   vs single: single
+       why: Answer 2 is more decision-useful and better structured. It provides concrete reasoning with specific examples (Kubernetes, service discovery
+
+=== TALLY (verdicts consistent across both answer orders) ===
+  cross_vs_same    -> same     : 3
+  cross_vs_single  -> single   : 2
+  cross_vs_single  -> split    : 1
+  same_vs_single   -> single   : 3
+JUDGE DONE

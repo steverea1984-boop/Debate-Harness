@@ -1,0 +1,34 @@
+========================================================================
+Is nuclear power a necessary part of decarbonizing the elect
+  cross  vs single: cross
+       why: Answer 1 directly addresses the question about nuclear power and decarbonization with substantive analysis covering technical feasibility, e
+  cross  vs same  : same
+       why: Answer 2 is better reasoned because it moves beyond a generic 'both have tradeoffs' framing to provide a structured, conditional framework f
+  same   vs single: same
+       why: Answer 1 directly addresses the question about nuclear power and grid decarbonization with substantive, well-structured reasoning covering g
+========================================================================
+For a 30-year-old with a stable income, is paying off a 4% m
+  cross  vs single: cross
+       why: Answer 1 provides deeper analytical substance: it quantifies the after-tax spread (noting it narrows to ~1.6% in taxable accounts), explicit
+  cross  vs same  : cross
+       why: Answer 1 is slightly better reasoned overall. It correctly identifies that historical real returns on equities (~7% inflation-adjusted) clea
+  same   vs single: same
+       why: Answer 1 is better reasoned because it engages more critically with the actual numbers rather than just listing pros and cons. It correctly 
+========================================================================
+Should an early-stage startup default to a monolith or micro
+  cross  vs single: SPLIT (tie then single)
+       why: Both answers reach the same well-reasoned conclusion (default to a monolith) with nearly identical supporting arguments: speed/iteration, lo
+  cross  vs same  : SPLIT (cross then same)
+       why: Both answers reach the same correct conclusion (default to monolith), but Answer 1 is better reasoned. It is more direct and tightly argued,
+  same   vs single: single
+       why: Answer 2 is better structured and more decision-useful. It gives a clear, direct recommendation up front, provides concrete thresholds for w
+
+=== TALLY (verdicts consistent across both answer orders) ===
+  cross_vs_same    -> cross    : 1
+  cross_vs_same    -> same     : 1
+  cross_vs_same    -> split    : 1
+  cross_vs_single  -> cross    : 2
+  cross_vs_single  -> split    : 1
+  same_vs_single   -> same     : 2
+  same_vs_single   -> single   : 1
+JUDGE2 DONE
