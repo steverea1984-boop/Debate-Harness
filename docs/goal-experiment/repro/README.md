@@ -3,6 +3,13 @@
 Raw artifacts behind [`../findings.md`](../findings.md), so the reported rankings
 can be audited.
 
+> **Correction (Round 2c):** a PR review caught that the original `round2-answers-p0.json`
+> `single` answer was off-topic (a model glitch). It was regenerated (now on-topic),
+> the judge's per-answer truncation was raised from 3,500 to 12,000 chars (so full
+> answers are evaluated), and all three prompts were re-judged. `round2-answers-p0.json`
+> and `round2-judge-output.txt` here are the **corrected** versions; the findings report
+> the corrected tally.
+
 ## Setup (both rounds)
 
 - **Prompts (3):** nuclear vs. renewables; prepay a 4% mortgage vs. invest;

@@ -13,8 +13,8 @@ SYS = ("You are an impartial expert evaluator. Given a question and two candidat
        "decision-useful, and more honest about tradeoffs. Ignore length and writing style; "
        "judge substance. If genuinely equal, answer tie.")
 def ask(prompt, first, second):
-    user = (f"QUESTION:\n{prompt}\n\n=== ANSWER 1 ===\n{first[:3500]}\n\n"
-            f"=== ANSWER 2 ===\n{second[:3500]}\n\nWhich answer is better reasoned?")
+    user = (f"QUESTION:\n{prompt}\n\n=== ANSWER 1 ===\n{first[:12000]}\n\n"
+            f"=== ANSWER 2 ===\n{second[:12000]}\n\nWhich answer is better reasoned?")
     return JUDGE.complete_json(SYS, user, SCHEMA, 600)
 def compare(prompt, xl, xt, yl, yt):
     r1 = ask(prompt, xt, yt); w1 = xl if r1["winner"]=="1" else yl if r1["winner"]=="2" else "tie"

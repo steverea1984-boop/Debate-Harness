@@ -4,13 +4,18 @@ _Run 2026-06-19. The first experiment to measure the project's actual goal:
 **better-reasoned answers**, not just outcome labels (§9, §13)._
 
 **Bottom line:** Round 1 found debate *losing* to a single model — but that was an
-artifact of the synthesis step compressing the answer. With that step fixed
-(Round 2), **debate beats a single model.** Cross-vs-same is still a wash.
+artifact of the synthesis step compressing the answer (fixed in Round 2). With the
+fix **and a corrected baseline** (Round 2c), the honest result is **weak and mixed**:
+**same-model debate modestly beats a single model (2/3); cross-model vs. single is a
+wash; same edges cross.** Not the clean "debate wins" an earlier (flawed) pass
+reported. n=3 — directional only.
 
 _Raw artifacts (answers, judge verdicts + reasons, scripts, exact setup) are in
-[`repro/`](repro/) so every claim below is auditable. The present-step fix that
-produced the Round 2 flip is PR #13. This experiment was run at Steve's request to
-test the project's core goal (does debate beat a single model?)._
+[`repro/`](repro/) so every claim below is auditable. The present-step fix is PR #13.
+Run at Steve's request to test the project's core goal. **Data-integrity note:** an
+automated PR review caught that one Round 2 `single` answer was off-topic
+(a model glitch); it was regenerated and the whole set re-judged on full
+(untruncated) answers — those corrected numbers are the ones reported here._
 
 ## The question
 
@@ -89,26 +94,35 @@ the exact same experiment. (Cross partner was Llama 3.3 70B this round — Qwen 
 rate-limited upstream — still DeepSeek × a different vendor.)
 
 The debate finals went from ~650–1,400 chars to **3,266–4,635 chars** — now
-comparable to or longer than the single answers. The verdicts flipped:
+comparable to or longer than the single answers.
 
-| Comparison | Round 1 | **Round 2 (fixed)** |
-|---|---|---|
-| cross vs single | single 2/3 | **cross 2/3** (1 split) |
-| same vs single  | single 3/3 | **same 2/3** (1 single) |
-| cross vs same   | same 3/3   | **1–1 wash** (1 split) |
+**Data-integrity correction (Round 2c).** A first pass at Round 2 *appeared* to show
+debate winning cleanly (cross 2/3, same 2/3 vs. single). An automated PR review then
+caught that the **p0 `single` answer was contaminated** — a model glitch returned
+off-topic text instead of a nuclear answer — so debate had "won" p0 against a
+non-answer, and the judge only saw the truncated first 3,500 chars so it never
+noticed. We **regenerated that answer and re-judged all three prompts on full,
+untruncated text.** The corrected verdicts:
 
-**Conclusion: once the synthesis step delivers a complete answer, debate beats a
-single model** (both cross- and same-model debate win ~2/3 vs. single). The Round 1
-"debate loses" result was an artifact of the compressed `present` step, **not** the
-debate's reasoning — exactly as the confound predicted. Fix shipped in the
-present-step PR.
+| Comparison | Round 1 | Round 2 (flawed) | **Round 2c (corrected)** |
+|---|---|---|---|
+| cross vs single | single 2/3 | cross 2/3 | **wash — cross 1/3, 2 splits** |
+| same vs single  | single 3/3 | same 2/3 | **same 2/3** (1 split) |
+| cross vs same   | same 3/3   | 1–1 wash | **same 2/3** |
 
-**Cross vs. same is still a wash** — both beat single, but neither clearly beats the
-other. That (the §9 question) is the open thread, and the natural next probe is a
-different *interaction structure* — e.g. a **collaborative** mode (two models giving
-each other constructive feedback toward a joint best answer) vs. the current
-adversarial debate. Whether collaboration beats adversarial, or just reintroduces
-the sycophancy the adversarial design exists to fight, is the next experiment.
+**Honest conclusion:** fixing the synthesis step *did* remove the Round 1 artifact
+(debate no longer loses on length), but on clean data the evidence that **debate
+beats a single model is weak and mixed**: same-model debate modestly beats single
+(2/3), cross-model vs. single is a wash, and same edges cross. At **n = 3** this is
+directional at best — *not* the clean "debate wins" the flawed pass suggested. The
+present-step fix (PR #13) stands on its own merit (a one-paragraph synthesis of a
+full debate is self-evidently poor); the inflated quality claim does not.
+
+The natural next probe for the §9 / interaction-structure question is a different
+*structure* — e.g. a **collaborative** mode (two models giving each other
+constructive feedback toward a joint best answer) vs. the current adversarial
+debate. Whether collaboration beats adversarial, or just reintroduces the sycophancy
+the adversarial design exists to fight, is the next experiment.
 
 ## Caveats
 

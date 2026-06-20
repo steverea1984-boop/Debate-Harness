@@ -1,34 +1,37 @@
+truncation bumped in both judge scripts:
+[:12000]
+[:12000]
+--- re-judging with fixed p0 single + full text ---
 ========================================================================
 Is nuclear power a necessary part of decarbonizing the elect
-  cross  vs single: cross
-       why: Answer 1 directly addresses the question about nuclear power and decarbonization with substantive analysis covering technical feasibility, e
+  cross  vs single: SPLIT (cross then single)
+       why: Answer 1 is better reasoned because it goes deeper into the actual technical and economic substance—specifically addressing long-duration st
   cross  vs same  : same
-       why: Answer 2 is better reasoned because it moves beyond a generic 'both have tradeoffs' framing to provide a structured, conditional framework f
+       why: Answer 2 is better reasoned because it provides a more structured, conditional framework rather than a general 'both have merits' conclusion
   same   vs single: same
-       why: Answer 1 directly addresses the question about nuclear power and grid decarbonization with substantive, well-structured reasoning covering g
+       why: Answer 1 provides superior reasoning by establishing a conditional necessity framework with specific, testable criteria (geographic constrai
 ========================================================================
 For a 30-year-old with a stable income, is paying off a 4% m
   cross  vs single: cross
-       why: Answer 1 provides deeper analytical substance: it quantifies the after-tax spread (noting it narrows to ~1.6% in taxable accounts), explicit
+       why: Answer 1 provides more rigorous analysis with better quantification (e.g., specifying the ~3% spread, noting how taxes narrow it to ~1.6% in
   cross  vs same  : cross
-       why: Answer 1 is slightly better reasoned overall. It correctly identifies that historical real returns on equities (~7% inflation-adjusted) clea
+       why: Answer 1 is more accurate and better-calibrated on key factual points. Critically, it correctly states that historical S&P 500 inflation-adj
   same   vs single: same
-       why: Answer 1 is better reasoned because it engages more critically with the actual numbers rather than just listing pros and cons. It correctly 
+       why: Answer 1 is better reasoned because it goes beyond listing tradeoffs to actually quantify the after-tax, after-fee spread between investing 
 ========================================================================
 Should an early-stage startup default to a monolith or micro
   cross  vs single: SPLIT (tie then single)
-       why: Both answers reach the same well-reasoned conclusion (default to a monolith) with nearly identical supporting arguments: speed/iteration, lo
-  cross  vs same  : SPLIT (cross then same)
-       why: Both answers reach the same correct conclusion (default to monolith), but Answer 1 is better reasoned. It is more direct and tightly argued,
-  same   vs single: single
-       why: Answer 2 is better structured and more decision-useful. It gives a clear, direct recommendation up front, provides concrete thresholds for w
+       why: Both answers reach the same correct conclusion (default to a monolith) and cover essentially the same reasoning: speed of iteration, lower o
+  cross  vs same  : same
+       why: Answer 2 provides more actionable and nuanced guidance by explicitly emphasizing 'rigorously modular' monolith design as a non-negotiable pr
+  same   vs single: SPLIT (tie then single)
+       why: Both answers reach the same correct conclusion (default to a modular monolith) and cover essentially the same reasoning: speed of iteration,
 
 === TALLY (verdicts consistent across both answer orders) ===
   cross_vs_same    -> cross    : 1
-  cross_vs_same    -> same     : 1
-  cross_vs_same    -> split    : 1
-  cross_vs_single  -> cross    : 2
-  cross_vs_single  -> split    : 1
+  cross_vs_same    -> same     : 2
+  cross_vs_single  -> cross    : 1
+  cross_vs_single  -> split    : 2
   same_vs_single   -> same     : 2
-  same_vs_single   -> single   : 1
-JUDGE2 DONE
+  same_vs_single   -> split    : 1
+REJUDGE DONE
