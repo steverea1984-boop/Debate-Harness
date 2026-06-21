@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
-from .config import Config, ORCHESTRATOR_DIR, ROLES_DIR, STAGE_NAMES
+from .config import Config, ORCHESTRATOR_DIR, ROLES_DIR, STAGE_NAMES, BUILD_STAGE_NAMES
 from .judge import Judge, JudgeRead, TERMINAL_SHAPES
 from .logging_utils import RunLogger
 from .circularity import CircularityDetector
@@ -28,29 +28,79 @@ def _read(path) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
-def build_debater_system(role: str) -> str:
-    baseline = _read(ROLES_DIR / "baseline.md")
-    overlay = _read(ROLES_DIR / f"{role}.md")
+def build_debater_system(role: str, mode: str = "debate") -> str:
+    if mode == "build":
+        # Both slots share the non-adversarial builder role on a build baseline.
+        baseline = _read(ROLES_DIR / "build_baseline.md")
+        overlay = _read(ROLES_DIR / "builder.md")
+    else:
+        baseline = _read(ROLES_DIR / "baseline.md")
+        overlay = _read(ROLES_DIR / f"{role}.md")
     return f"{baseline}\n\n---\n\n{overlay}"
+
+
+# Build-mode turn output is "<revised answer>\n=== CHANGES ===\n<changelog>".
+_CHANGES_DELIM = "=== CHANGES ==="
+
+
+def split_build_output(raw: str) -> tuple[str, str]:
+    """Split a build turn into (revised_answer, changelog). Missing delimiter ->
+    the whole output is the answer, empty changelog (robust fallback). Splits on
+    the FIRST delimiter (``partition``); the role file instructs the marker only at
+    the end, so an answer body that repeats it would be truncated there — acceptable
+    given the instruction, and never blanks the artifact."""
+    answer, sep, changelog = raw.partition(_CHANGES_DELIM)
+    return answer.strip(), (changelog.strip() if sep else "")
 
 
 # ----------------------------------------------------------------------------
 # Debater agent: a provider + its standing role system prompt
 # ----------------------------------------------------------------------------
 class Debater:
-    def __init__(self, slot: str, provider: Provider, role: str, max_tokens: int):
+    def __init__(self, slot: str, provider: Provider, role: str, max_tokens: int, mode: str = "debate"):
         self.slot = slot
         self.provider = provider
         self.role = role
-        self.system = build_debater_system(role)
+        self.mode = mode
+        self.system = build_debater_system(role, mode)
         self.max_tokens = max_tokens
 
-    def seed_answer(self, refined_prompt: str) -> str:
+    def build_turn(
+        self, refined_prompt: str, working_answer: str, prev_changelog: str, stage: int
+    ) -> str:
+        """One build-mode turn: revise the shared working answer. Returns raw output
+        (revised answer + ``=== CHANGES ===`` changelog); the caller splits it."""
         instruction = (
-            f"[Orchestrator] You are the {self.role}. The debate is in Stage 1 "
-            f"({STAGE_NAMES[1]}). Give your initial answer to the question, "
-            "adopting your Stage 1 posture. This is your opening position."
+            f"[Orchestrator] The collaboration is in Stage {stage} "
+            f"({BUILD_STAGE_NAMES[stage]}). Below is the current shared working answer. "
+            "Revise it per your role and this stage: preserve what is sound, extend "
+            "it with real detail, and challenge what is weak — with a reason for "
+            "every change. Return the COMPLETE revised answer, then the changelog "
+            "(format from your instructions).\n\n"
+            f"[The question]\n{refined_prompt}\n\n"
+            f"[Current shared working answer]\n{working_answer}"
         )
+        if prev_changelog:
+            instruction += f"\n\n[The other model's last changes]\n{prev_changelog}"
+        messages = [{"role": "user", "content": instruction}]
+        return self.provider.complete(self.system, messages, self.max_tokens)
+
+    def seed_answer(self, refined_prompt: str) -> str:
+        if self.mode == "build":
+            instruction = (
+                f"[Orchestrator] The collaboration is in Stage 1 "
+                f"({BUILD_STAGE_NAMES[1]}). Write the INITIAL draft of the shared "
+                "answer: your best, complete, well-structured answer to the question "
+                "— a strong foundation the two of you will build on and refine "
+                "together. This is a starting draft to build on, not a competitive "
+                "debate stance."
+            )
+        else:
+            instruction = (
+                f"[Orchestrator] You are the {self.role}. The debate is in Stage 1 "
+                f"({STAGE_NAMES[1]}). Give your initial answer to the question, "
+                "adopting your Stage 1 posture. This is your opening position."
+            )
         messages = [
             {"role": "user", "content": f"[The question under debate]\n{refined_prompt}"},
             {"role": "user", "content": instruction},
@@ -151,18 +201,24 @@ class Orchestrator:
             make_provider(config.effective_judge_provider, config.effective_judge_model),
             config.orchestrator_max_tokens,
         )
+        # In build mode both slots share the symmetric "builder" role; in debate
+        # mode they keep their configured proposer/skeptic roles.
+        role_a = "builder" if config.mode == "build" else config.slot_a.role
+        role_b = "builder" if config.mode == "build" else config.slot_b.role
         self.debaters = {
             "A": Debater(
                 "A",
                 make_provider(config.slot_a.provider, config.slot_a.model),
-                config.slot_a.role,
+                role_a,
                 config.debater_max_tokens,
+                mode=config.mode,
             ),
             "B": Debater(
                 "B",
                 make_provider(config.slot_b.provider, config.slot_b.model),
-                config.slot_b.role,
+                role_b,
                 config.debater_max_tokens,
+                mode=config.mode,
             ),
         }
         self.log = logger or RunLogger()
@@ -219,16 +275,28 @@ class Orchestrator:
         self.log.event("seed_answer", slot="A", role=self.debaters["A"].role, text=ans_a)
         self.log.event("seed_answer", slot="B", role=self.debaters["B"].role, text=ans_b)
 
-        user = (
-            "Both debaters answered the refined prompt independently. Pick the "
-            "stronger answer to SEED the sequential debate (the other model will "
-            "respond to it). Judge by comprehensiveness, clarity, and relevance — "
-            "and note that the best seed for sparking a good debate is not always "
-            "the safest answer. Judge form, not which side is 'right'.\n\n"
-            f"REFINED PROMPT:\n{refined_prompt}\n\n"
-            f"ANSWER A ({self.debaters['A'].role}):\n{ans_a}\n\n"
-            f"ANSWER B ({self.debaters['B'].role}):\n{ans_b}"
-        )
+        if self.config.mode == "build":
+            user = (
+                "Both models independently drafted an initial answer. Pick the "
+                "stronger one to be the STARTING DRAFT of the shared answer that both "
+                "will build on and refine. Choose the best foundation: the most "
+                "comprehensive, well-structured, and complete draft — the one that "
+                "gives the most to build on. Judge the draft, not which side is "
+                "'right'.\n\n"
+                f"REFINED PROMPT:\n{refined_prompt}\n\n"
+                f"ANSWER A:\n{ans_a}\n\nANSWER B:\n{ans_b}"
+            )
+        else:
+            user = (
+                "Both debaters answered the refined prompt independently. Pick the "
+                "stronger answer to SEED the sequential debate (the other model will "
+                "respond to it). Judge by comprehensiveness, clarity, and relevance — "
+                "and note that the best seed for sparking a good debate is not always "
+                "the safest answer. Judge form, not which side is 'right'.\n\n"
+                f"REFINED PROMPT:\n{refined_prompt}\n\n"
+                f"ANSWER A ({self.debaters['A'].role}):\n{ans_a}\n\n"
+                f"ANSWER B ({self.debaters['B'].role}):\n{ans_b}"
+            )
         data = self.orch.complete_json(
             self.system, user, _SEED_SCHEMA, self.config.orchestrator_max_tokens
         )
@@ -494,6 +562,169 @@ class Orchestrator:
             self.log.md(f"**Note:** {result.note_to_user}\n")
         return result
 
+    # --- 3b. Build loop (cumulative shared answer; mode="build") ----------
+    def run_build(self, transcript: Transcript) -> tuple[str, Optional[JudgeRead], str]:
+        cfg = self.config
+        seed = transcript.turns[0]
+        working_answer = seed.text  # the seed answer is the initial draft
+        current = "B" if seed.speaker_slot == "A" else "A"
+        prev_changelog = ""
+        stop_reason = "turn_cap"
+        last_read: Optional[JudgeRead] = None
+        controller = StageController(cfg)
+        detector = CircularityDetector(cfg)
+
+        for debate_turn in range(1, cfg.turn_cap + 1):
+            stage = controller.current_stage(debate_turn)
+            debater = self.debaters[current]
+            raw = debater.build_turn(
+                transcript.refined_prompt, working_answer, prev_changelog, stage
+            )
+            answer, changelog = split_build_output(raw)
+            if len(answer) < 20:  # near-empty: keep the prior answer, never blank it
+                self.log.event("build_turn_noop", index=debate_turn, slot=current, raw=raw[:300])
+                answer = working_answer
+            working_answer = answer
+            prev_changelog = changelog
+
+            transcript.add(
+                Turn(
+                    index=debate_turn,
+                    speaker_slot=current,
+                    speaker_role=debater.role,
+                    stage=stage,
+                    text=working_answer,
+                    kind="build",
+                )
+            )
+            self.log.event(
+                "build_turn",
+                index=debate_turn,
+                slot=current,
+                role=debater.role,
+                stage=stage,
+                stage_name=BUILD_STAGE_NAMES[stage],
+                working_answer=working_answer,
+                changelog=changelog,
+            )
+            self.log.md_header(
+                f"Turn {debate_turn} — builder (slot {current}) "
+                f"| Stage {stage} ({BUILD_STAGE_NAMES[stage]})",
+                level=3,
+            )
+            self.log.md(working_answer)
+            if changelog:
+                self.log.md(f"\n**Changes:**\n{changelog}")
+
+            read = self.judge.read(transcript, stage)
+            last_read = read
+            self.log.event(
+                "judge_read",
+                after_turn=debate_turn,
+                scheduled_stage=stage,
+                perceived_stage=read.perceived_stage,
+                consensus_shape=read.consensus_shape,
+                confidence=read.confidence,
+                should_stop=read.should_stop,
+                reason=read.reason,
+            )
+            self.log.md(
+                f"> **Judge (observe-only):** perceived stage = "
+                f"`{read.perceived_stage}` | consensus = `{read.consensus_shape}` "
+                f"| confidence = {read.confidence:.2f}\n>\n> {read.reason}\n"
+            )
+
+            controller.observe(debate_turn, read)
+            if controller.last_transition:
+                t = controller.last_transition
+                self.log.event(
+                    "stage_transition",
+                    after_turn=debate_turn,
+                    from_stage=t["from"],
+                    to_stage=t["to"],
+                    reason=t["reason"],
+                )
+
+            # When the working answer stops changing, the structural detector reads
+            # it as circular — a natural convergence signal for build mode.
+            cread = detector.read(transcript)
+            self.log.event(
+                "circularity_read",
+                after_turn=debate_turn,
+                evaluated=cread.evaluated,
+                scores=cread.pair_scores,
+                is_circular=cread.is_circular,
+            )
+
+            if (
+                cfg.enable_judge_stop
+                and read.should_stop
+                and read.consensus_shape in TERMINAL_SHAPES
+            ):
+                stop_reason = f"judge:{read.consensus_shape}"
+                break
+            if cfg.enable_circularity_stop and cread.is_circular:
+                stop_reason = "circular"
+                break
+
+            current = "B" if current == "A" else "A"
+
+        self.log.event("stop", reason=stop_reason)
+        return stop_reason, last_read, working_answer
+
+    # --- 4b. Present (build mode): metadata only, answer passes through ----
+    def present_build(
+        self,
+        transcript: Transcript,
+        stop_reason: str,
+        last_read: Optional[JudgeRead],
+        working_answer: str,
+    ) -> DebateResult:
+        judge_note = ""
+        if last_read is not None:
+            judge_note = (
+                f"The observe-only judge's final read was consensus="
+                f"{last_read.consensus_shape}, perceived_stage="
+                f"{last_read.perceived_stage} (confidence {last_read.confidence:.2f})."
+            )
+        user = (
+            "Two models collaboratively built a single shared answer. Do NOT rewrite "
+            "or summarize it — it is final as written. Classify the result as metadata "
+            "only: set outcome_type to genuine_consensus if they converged with no open "
+            "dispute, productive_stalemate if a real residual disagreement remains, or "
+            f"turn_cap_no_convergence/circular_no_convergence otherwise (stop reason: {stop_reason}). "
+            "Give a short residual_disagreement if any, and a brief note_to_user. Leave "
+            "final_answer as an empty string.\n\n"
+            f"{judge_note}\n\nFINAL BUILT ANSWER:\n{working_answer}"
+        )
+        data = self.orch.complete_json(
+            self.system, user, _PRESENT_SCHEMA, self.config.orchestrator_max_tokens
+        )
+        result = DebateResult(
+            transcript=transcript,
+            outcome_type=data.get("outcome_type", "turn_cap_no_convergence"),
+            final_answer=working_answer,  # pass-through: the built answer verbatim
+            residual_disagreement=data.get("residual_disagreement", ""),
+            note_to_user=data.get("note_to_user", ""),
+            stop_reason=stop_reason,
+            log_dir=str(self.log.dir),
+        )
+        self.log.event(
+            "present",
+            outcome_type=result.outcome_type,
+            final_answer=result.final_answer,
+            residual_disagreement=result.residual_disagreement,
+            note_to_user=result.note_to_user,
+        )
+        self.log.md_header("Final result")
+        self.log.md(f"**Outcome:** {result.outcome_type}\n")
+        self.log.md(f"**Answer:**\n{result.final_answer}\n")
+        if result.residual_disagreement.strip():
+            self.log.md(f"**Residual disagreement:**\n{result.residual_disagreement}\n")
+        if result.note_to_user.strip():
+            self.log.md(f"**Note:** {result.note_to_user}\n")
+        return result
+
     # --- end-to-end -------------------------------------------------------
     def run(
         self,
@@ -514,8 +745,12 @@ class Orchestrator:
 
         refined = self.refine_prompt(raw_prompt, ask_user=ask_user)
         transcript = self.seed(refined)
-        stop_reason, last_read = self.run_debate(transcript)
-        result = self.present(transcript, stop_reason, last_read)
+        if self.config.mode == "build":
+            stop_reason, last_read, working_answer = self.run_build(transcript)
+            result = self.present_build(transcript, stop_reason, last_read, working_answer)
+        else:
+            stop_reason, last_read = self.run_debate(transcript)
+            result = self.present(transcript, stop_reason, last_read)
         self.log.finalize(
             outcome_type=result.outcome_type,
             stop_reason=stop_reason,
