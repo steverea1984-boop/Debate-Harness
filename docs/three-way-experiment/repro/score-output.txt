@@ -1,0 +1,26 @@
+========================================================================
+q0.json - What are the main tradeoffs between SQL (relational) an
+  single  coverage=8.0/8 (100%)  errors=0  len=4086
+  debate  coverage=5.5/8 (69%)  errors=0  len=3460
+  build   coverage=8.0/8 (100%)  errors=0  len=8697
+========================================================================
+q1.json - What were the primary causes of the 2008 global financi
+  single  coverage=8.0/8 (100%)  errors=0  len=3173
+  debate  coverage=6.5/8 (81%)  errors=0  len=2154
+  build   coverage=8.0/8 (100%)  errors=0  len=8568
+========================================================================
+q2.json - What are the main security risks of applications built 
+  single  coverage=2.5/8 (31%)  errors=0  len=4017
+  debate  coverage=1.5/8 (19%)  errors=0  len=3055
+  build   coverage=3.0/8 (38%)  errors=0  len=7519
+========================================================================
+q3.json - What are the key tradeoffs between monolithic and micro
+  single  coverage=7.5/8 (94%)  errors=0  len=6323
+  debate  coverage=6.0/8 (75%)  errors=0  len=3816
+  build   coverage=6.0/8 (75%)  errors=0  len=5963
+
+=== AVERAGES across all questions ===
+  single  coverage=81%   errors/ans=0.00   len=4399
+  debate  coverage=61%   errors/ans=0.00   len=3121
+  build   coverage=78%   errors/ans=0.00   len=7686
+SCORING DONE
