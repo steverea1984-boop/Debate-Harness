@@ -32,7 +32,10 @@ For each of 3 hard, genuinely contested prompts (nuclear vs. renewables; prepay 
 
 1. **single** — DeepSeek V3 alone, no debate (just asked for its best answer).
 2. **same** — DeepSeek V3 × DeepSeek V3 debate.
-3. **cross** — DeepSeek V3 × Qwen2.5 72B debate.
+3. **cross** — DeepSeek V3 × a *different vendor*. **The cross partner differs by
+   round:** **Round 1 used Qwen2.5 72B**; **Round 2 / 2c used Llama 3.3 70B** (Qwen
+   was rate-limited upstream when Round 2 ran). So cross-round comparisons of the
+   *cross* arm mix two different partners — the reliable claims are *within* a round.
 
 Debates used the validated `gpt-4.1-mini` orchestrator/judge, schedule 2/2/1.
 A strong, neutral judge (**Claude Sonnet 4.6**, blind to which answer is which)
@@ -127,13 +130,20 @@ the adversarial design exists to fight, is the next experiment.
 ## Caveats
 
 - **n = 3 prompts, one debater pair per round, one judge model.** Directional, not
-  definitive. The cross partner differs between rounds (Qwen R1, Llama R2, due to a
-  rate limit), so the cleanest claim is *within* Round 2: debate > single.
-- **Length confound is large** and not fully neutralized by the "ignore length"
-  instruction — it likely drives most of the single-model win.
+  definitive. The cross partner differs between rounds (Qwen R1, Llama R2/2c), so the
+  reliable claims are *within* a round; in Round 2c that is: **same-model debate
+  modestly beats single (2/3); cross-vs-single is a wash; same edges cross.**
+- **Length confound drove Round 1** (where debate finals were 2–4× shorter and lost).
+  It is **neutralized in Round 2/2c** — the fixed `present` step makes debate finals
+  comparable in length — which is why the Round 2c numbers, not Round 1, are the
+  honest read.
 - The "single" answer is raw DeepSeek; the debate "final" is a `gpt-4.1-mini`
   synthesis — so this also compares two different synthesizers, not just
   debate-vs-no-debate.
+- **Data integrity:** one Round 2 `single` answer was contaminated (off-topic) and
+  silently inflated an earlier pass; it was caught in review, regenerated, and the
+  set re-judged on full untruncated text (Round 2c). Validate that baseline answers
+  are on-topic before trusting any quality tally.
 
 _Reproduce: produce answers with a single provider call + two debates per prompt,
 then blind-judge with a strong model in both orders. The debate finals come from

@@ -55,3 +55,26 @@ py -3.13 judge.py
 **Path note:** the scripts write/read `"/tmp/goalres/..."`. Run under Windows
 `py`, that string resolves to `F:\tmp\goalres\` (drive-relative), *not* the
 Git-Bash `/tmp`. The committed `round2-answers-*.json` are copies of those outputs.
+
+## Artifact manifest (Round 2c — verifies every answer is on-topic)
+
+Each answer's length + on-topic keyword check + opening line, so the tally can be
+audited even if the file diff is truncated. All 9 are on-topic (>=2 topic keywords).
+
+**p0** — nuclear vs. renewables:
+- single: 3071 chars, on-topic (4 kw) — "The question of whether nuclear power is necessary for deep decarbonization..."
+- same:   3537 chars, on-topic (4 kw) — "The debate establishes that nuclear power is not universally necessary for..."
+- cross:  3820 chars, on-topic (4 kw) — "The debate concludes with a nuanced understanding that achieving a fully de..."
+
+**p1** — prepay 4% mortgage vs. invest:
+- single: 2779 chars, on-topic (4 kw) — "The decision between paying off a 4% mortgage early or investing the differ..."
+- same:   4039 chars, on-topic (4 kw) — "For a 30-year-old with stable income and a 4% mortgage, the financially bet..."
+- cross:  4635 chars, on-topic (4 kw) — "For a 30-year-old individual with a stable income and a fixed-rate 4% mortg..."
+
+**p2** — monolith vs. microservices:
+- single: 3193 chars, on-topic (3 kw) — "For an early-stage startup, the default choice should almost always be a..."
+- same:   4558 chars, on-topic (3 kw) — "For an early-stage startup launching a new product, the optimal default arc..."
+- cross:  3266 chars, on-topic (3 kw) — "For early-stage startups developing a new product, the default architectura..."
+
+The full per-comparison verdicts + reasons (both answer orders) and the final
+tally are in `round2-judge-output.txt`.
