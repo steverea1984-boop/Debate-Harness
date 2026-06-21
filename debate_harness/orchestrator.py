@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
-from .config import Config, ORCHESTRATOR_DIR, ROLES_DIR, STAGE_NAMES
+from .config import Config, ORCHESTRATOR_DIR, ROLES_DIR, STAGE_NAMES, BUILD_STAGE_NAMES
 from .judge import Judge, JudgeRead, TERMINAL_SHAPES
 from .logging_utils import RunLogger
 from .circularity import CircularityDetector
@@ -45,7 +45,10 @@ _CHANGES_DELIM = "=== CHANGES ==="
 
 def split_build_output(raw: str) -> tuple[str, str]:
     """Split a build turn into (revised_answer, changelog). Missing delimiter ->
-    the whole output is the answer, empty changelog (robust fallback)."""
+    the whole output is the answer, empty changelog (robust fallback). Splits on
+    the FIRST delimiter (``partition``); the role file instructs the marker only at
+    the end, so an answer body that repeats it would be truncated there — acceptable
+    given the instruction, and never blanks the artifact."""
     answer, sep, changelog = raw.partition(_CHANGES_DELIM)
     return answer.strip(), (changelog.strip() if sep else "")
 
@@ -68,7 +71,7 @@ class Debater:
         (revised answer + ``=== CHANGES ===`` changelog); the caller splits it."""
         instruction = (
             f"[Orchestrator] The collaboration is in Stage {stage} "
-            f"({STAGE_NAMES[stage]}). Below is the current shared working answer. "
+            f"({BUILD_STAGE_NAMES[stage]}). Below is the current shared working answer. "
             "Revise it per your role and this stage: preserve what is sound, extend "
             "it with real detail, and challenge what is weak — with a reason for "
             "every change. Return the COMPLETE revised answer, then the changelog "
@@ -577,13 +580,13 @@ class Orchestrator:
                 slot=current,
                 role=debater.role,
                 stage=stage,
-                stage_name=STAGE_NAMES[stage],
+                stage_name=BUILD_STAGE_NAMES[stage],
                 working_answer=working_answer,
                 changelog=changelog,
             )
             self.log.md_header(
                 f"Turn {debate_turn} — builder (slot {current}) "
-                f"| Stage {stage} ({STAGE_NAMES[stage]})",
+                f"| Stage {stage} ({BUILD_STAGE_NAMES[stage]})",
                 level=3,
             )
             self.log.md(working_answer)

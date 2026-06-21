@@ -124,9 +124,12 @@ A sibling of `run_debate`:
      Stages advance on the existing schedule. `--judge-stop` / `--circularity-stop`
      remain available but **off by default**; the circularity detector also naturally
      fires if the working answer stops changing (a fine convergence signal).
-   - **Anti-thrash:** reuse `max_stage_reversals`-style bounding — track points removed
-     with a reason; the role rules plus a logged `reversal` count keep remove/restore
-     loops bounded (cap = config knob, default 1, same spirit as stage reversals).
+   - **Anti-thrash (v1: role-rule based).** The builder role carries the rule: only
+     remove with a stated reason, and *accept a restoration if the reason is genuinely
+     answered* (don't re-delete a point whose objection has been met). v1 relies on
+     this role pressure — a numeric reversal cap / logged `reversal` count is a
+     possible later addition if thrash shows up in transcripts, but is not implemented
+     now (kept simple; reversible).
 3. Return `stop_reason`, `last_read`, and the final `working_answer`.
 
 ### Present pass-through (build mode)

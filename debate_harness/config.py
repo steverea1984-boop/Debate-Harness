@@ -181,3 +181,10 @@ STAGE_NAMES = {
     2: "Work the disagreements",
     3: "Resolve",
 }
+
+# Build mode reuses the 3-stage schedule but with build-appropriate posture names.
+BUILD_STAGE_NAMES = {
+    1: "Draft & expand",
+    2: "Challenge & refine",
+    3: "Finalize",
+}
