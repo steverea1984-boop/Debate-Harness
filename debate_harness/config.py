@@ -81,6 +81,15 @@ class Config:
         default_factory=lambda: os.environ.get("JUDGE_MODEL")
     )
 
+    # --- Interaction mode --------------------------------------------------
+    # "debate"  : adversarial proposer vs skeptic; final answer synthesized by the
+    #             present step (the original behavior).
+    # "build"   : cumulative shared-answer — both slots use the builder role and
+    #             revise one growing working answer each turn; the final answer is
+    #             that working answer verbatim (no re-synthesis). See
+    #             docs/build-mode/spec.md.
+    mode: str = "debate"
+
     # --- Stage schedule (turn-based timer; spec §12) -----------------------
     # Number of *debate* turns spent in each stage (the seed answer is turn 0
     # and is implicitly stage 1). The turn cap is the sum of these. Adjusting

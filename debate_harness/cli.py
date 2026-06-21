@@ -17,6 +17,8 @@ Useful flags:
     --judge-stop           let a confident judge read end the debate early
     --state-2to3           let the judge's read drive the stage 2->3 transition
     --circularity-stop     stop early if the debate is structurally going in circles
+    --mode debate|build    interaction mode (default debate; build = cumulative
+                           shared answer, final answer is the built artifact)
     --same-model           run both slots on the Anthropic model (sycophancy baseline)
     --slot-a / --slot-b    override a debater's PROVIDER:MODEL
     --orchestrator         override the orchestrator's PROVIDER:MODEL
@@ -66,6 +68,8 @@ def _ask_user(questions: list[str]) -> dict[str, str]:
 
 def _build_config(args: argparse.Namespace) -> Config:
     cfg = Config()
+    if args.mode is not None:
+        cfg.mode = args.mode
     if args.no_clarify:
         cfg.clarify = False
     if args.judge_stop:
@@ -126,6 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--judge-stop", action="store_true", help="Let the judge end the debate early.")
     parser.add_argument("--state-2to3", action="store_true", help="Let the judge's read drive the stage 2->3 transition (default: pure timer).")
     parser.add_argument("--circularity-stop", action="store_true", help="Stop early if the debate is structurally circular (default: turn cap only).")
+    parser.add_argument("--mode", choices=["debate", "build"], default=None, help="Interaction mode: 'debate' (adversarial, default) or 'build' (cumulative shared answer).")
     parser.add_argument("--same-model", action="store_true", help="Run both slots on the Anthropic model (baseline).")
     parser.add_argument("--slot-a", type=_endpoint, metavar="PROVIDER:MODEL", help="Override slot A (proposer) provider+model.")
     parser.add_argument("--slot-b", type=_endpoint, metavar="PROVIDER:MODEL", help="Override slot B (skeptic) provider+model.")

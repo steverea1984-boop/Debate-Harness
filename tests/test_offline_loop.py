@@ -96,6 +96,23 @@ class EmptyRefineStubProvider(StubProvider):
         return data
 
 
+class BuildStubProvider(StubProvider):
+    """A stub for build mode: seed answers return a base draft; each build turn
+    carries the prior working answer forward and appends a marker, so accumulation
+    and verbatim pass-through are checkable. complete_json is inherited unchanged."""
+
+    _MARK = "[Current shared working answer]\n"
+
+    def complete(self, system, messages, max_tokens):
+        content = messages[-1]["content"]
+        if self._MARK in content:  # a build turn
+            wa = content.split(self._MARK, 1)[1]
+            wa = wa.split("\n\n[The other model's last changes]", 1)[0].strip()
+            self._n += 1
+            return f"{wa}\n[built turn {self._n}]\n=== CHANGES ===\n- added: turn {self._n}"
+        return "BASE DRAFT."  # seed answer (initial draft)
+
+
 class RepeatingStubProvider(StubProvider):
     """A stub whose debaters always say the same thing — a circular debate."""
 
@@ -129,6 +146,35 @@ class OfflineLoopTest(unittest.TestCase):
         orchestrator.Orchestrator(cfg, logger).run("Should X or Y?", ask_user=None)
         refine_evt = next(e for e in logger.record["events"] if e["kind"] == "refine")
         self.assertEqual(refine_evt["refined"], "Should X or Y?")
+
+    def test_build_mode_accumulates_and_passes_through(self):
+        # Build mode: one growing working answer; final answer = the last working
+        # answer verbatim (NOT the present step's re-synthesis).
+        self.provider_cls = BuildStubProvider
+        cfg = Config()
+        cfg.mode = "build"
+        cfg.stage1_turns, cfg.stage2_turns, cfg.stage3_turns = 1, 1, 1  # turn_cap 3
+        logger = RunLogger(label="build-test")
+        result = orchestrator.Orchestrator(cfg, logger).run("Should X or Y?", ask_user=None)
+
+        turns = result.transcript.turns
+        self.assertEqual(len(turns), 1 + cfg.turn_cap, "seed + turn_cap")
+        self.assertEqual(turns[0].kind, "seed")
+        self.assertTrue(all(t.kind == "build" for t in turns[1:]), "debate turns tagged build")
+
+        fa = result.final_answer
+        # accumulation: the seed draft survived and each turn added exactly one piece
+        self.assertIn("BASE DRAFT.", fa)
+        self.assertEqual(fa.count("[built turn"), cfg.turn_cap, "one accumulated addition per turn")
+
+        # pass-through: final answer == the last logged working answer, and is NOT the
+        # present step's synthesized text ("stub synthesis").
+        build_events = [e for e in logger.record["events"] if e["kind"] == "build_turn"]
+        self.assertEqual(len(build_events), cfg.turn_cap)
+        self.assertEqual(fa, build_events[-1]["working_answer"], "final answer = last working answer")
+        self.assertNotEqual(fa, "stub synthesis", "answer is passed through, not re-synthesized")
+        self.assertIn("added: turn", build_events[-1]["changelog"], "changelog parsed")
+        self.assertTrue(result.outcome_type, "metadata classification still produced")
 
     def test_full_loop_invariants(self):
         cfg = Config()

@@ -119,6 +119,7 @@ Useful flags:
 
 | Flag | Effect |
 |------|--------|
+| `--mode debate\|build` | Interaction mode. `debate` (default) = adversarial proposer vs skeptic, answer synthesized at the end. `build` = **cumulative shared answer**: both slots use one *builder* role and revise a single growing working answer each turn; the **final answer is that built artifact verbatim** (no re-synthesis). See `docs/build-mode/spec.md`. |
 | `--no-clarify` | Skip clarifying questions even in interactive mode. |
 | `--stages S1 S2 S3` | Turn counts per stage (default `3 3 2`). This is the **cooling-rate** knob (open question §2). |
 | `--judge-stop` | Let a *confident* judge read end the debate early (default: observe-only, turn-cap only). |
