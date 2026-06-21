@@ -111,9 +111,13 @@ empty changelog (robust fallback).
 ### The build loop (`run_build`)
 
 A sibling of `run_debate`:
-1. **Seed** (shared): both models answer independently; the orchestrator picks the
-   stronger as the **initial working answer** (reuse `seed()`; the seed turn's text is
-   the starting draft).
+1. **Seed** (shared loop, **mode-aware prompts**): both models independently produce
+   an initial answer; the orchestrator picks the stronger as the **initial working
+   answer** (the seed turn's text is the starting draft). In build mode the seed must
+   be non-adversarial from turn 0 — `seed_answer` uses build framing
+   (`BUILD_STAGE_NAMES[1]` "Draft & expand", "initial draft to build on"), and the
+   seed-selection rubric picks the **best starting draft to build on** (most
+   comprehensive/complete foundation), *not* the seed most likely to spark a debate.
 2. For `debate_turn in 1..turn_cap`, alternating slots (non-seeding model first):
    - Active model gets: refined prompt + **current working answer** + the **previous
      turn's changelog** + its stage posture. Returns revised answer + changelog.

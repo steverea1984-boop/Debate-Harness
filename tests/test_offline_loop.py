@@ -99,9 +99,13 @@ class EmptyRefineStubProvider(StubProvider):
 class BuildStubProvider(StubProvider):
     """A stub for build mode: seed answers return a base draft; each build turn
     carries the prior working answer forward and appends a marker, so accumulation
-    and verbatim pass-through are checkable. complete_json is inherited unchanged."""
+    and verbatim pass-through are checkable. Also captures the seed-answer and
+    seed-selection prompts (shared class lists) so the non-adversarial seed contract
+    can be asserted. complete_json branching is inherited."""
 
     _MARK = "[Current shared working answer]\n"
+    SEED_ANSWER_PROMPTS: list = []
+    SEED_SELECT_PROMPTS: list = []
 
     def complete(self, system, messages, max_tokens):
         content = messages[-1]["content"]
@@ -110,7 +114,13 @@ class BuildStubProvider(StubProvider):
             wa = wa.split("\n\n[The other model's last changes]", 1)[0].strip()
             self._n += 1
             return f"{wa}\n[built turn {self._n}]\n=== CHANGES ===\n- added: turn {self._n}"
+        BuildStubProvider.SEED_ANSWER_PROMPTS.append(content)
         return "BASE DRAFT."  # seed answer (initial draft)
+
+    def complete_json(self, system, user, schema, max_tokens):
+        if "seed_slot" in schema.get("properties", {}):
+            BuildStubProvider.SEED_SELECT_PROMPTS.append(user)
+        return super().complete_json(system, user, schema, max_tokens)
 
 
 class RepeatingStubProvider(StubProvider):
@@ -175,6 +185,29 @@ class OfflineLoopTest(unittest.TestCase):
         self.assertNotEqual(fa, "stub synthesis", "answer is passed through, not re-synthesized")
         self.assertIn("added: turn", build_events[-1]["changelog"], "changelog parsed")
         self.assertTrue(result.outcome_type, "metadata classification still produced")
+
+    def test_build_mode_seed_is_non_adversarial(self):
+        # The seed (turn 0) must already be in build framing, not debate framing.
+        self.provider_cls = BuildStubProvider
+        BuildStubProvider.SEED_ANSWER_PROMPTS.clear()
+        BuildStubProvider.SEED_SELECT_PROMPTS.clear()
+        cfg = Config()
+        cfg.mode = "build"
+        cfg.stage1_turns, cfg.stage2_turns, cfg.stage3_turns = 1, 1, 1
+        orchestrator.Orchestrator(cfg, RunLogger(label="build-seed")).run(
+            "Should X or Y?", ask_user=None
+        )
+
+        seed_answer = " ".join(BuildStubProvider.SEED_ANSWER_PROMPTS).lower()
+        self.assertIn("draft & expand", seed_answer)      # build stage label
+        self.assertIn("draft", seed_answer)
+        self.assertNotIn("opening position", seed_answer)  # debate framing absent
+        self.assertNotIn("surface & stress", seed_answer)
+
+        seed_select = " ".join(BuildStubProvider.SEED_SELECT_PROMPTS).lower()
+        self.assertIn("build on", seed_select)             # best starting draft
+        self.assertNotIn("spark", seed_select)             # not "spark a debate"
+        self.assertNotIn("sequential debate", seed_select)
 
     def test_full_loop_invariants(self):
         cfg = Config()

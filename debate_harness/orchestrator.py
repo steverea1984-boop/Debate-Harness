@@ -61,6 +61,7 @@ class Debater:
         self.slot = slot
         self.provider = provider
         self.role = role
+        self.mode = mode
         self.system = build_debater_system(role, mode)
         self.max_tokens = max_tokens
 
@@ -85,11 +86,21 @@ class Debater:
         return self.provider.complete(self.system, messages, self.max_tokens)
 
     def seed_answer(self, refined_prompt: str) -> str:
-        instruction = (
-            f"[Orchestrator] You are the {self.role}. The debate is in Stage 1 "
-            f"({STAGE_NAMES[1]}). Give your initial answer to the question, "
-            "adopting your Stage 1 posture. This is your opening position."
-        )
+        if self.mode == "build":
+            instruction = (
+                f"[Orchestrator] The collaboration is in Stage 1 "
+                f"({BUILD_STAGE_NAMES[1]}). Write the INITIAL draft of the shared "
+                "answer: your best, complete, well-structured answer to the question "
+                "— a strong foundation the two of you will build on and refine "
+                "together. This is a starting draft to build on, not a competitive "
+                "debate stance."
+            )
+        else:
+            instruction = (
+                f"[Orchestrator] You are the {self.role}. The debate is in Stage 1 "
+                f"({STAGE_NAMES[1]}). Give your initial answer to the question, "
+                "adopting your Stage 1 posture. This is your opening position."
+            )
         messages = [
             {"role": "user", "content": f"[The question under debate]\n{refined_prompt}"},
             {"role": "user", "content": instruction},
@@ -264,16 +275,28 @@ class Orchestrator:
         self.log.event("seed_answer", slot="A", role=self.debaters["A"].role, text=ans_a)
         self.log.event("seed_answer", slot="B", role=self.debaters["B"].role, text=ans_b)
 
-        user = (
-            "Both debaters answered the refined prompt independently. Pick the "
-            "stronger answer to SEED the sequential debate (the other model will "
-            "respond to it). Judge by comprehensiveness, clarity, and relevance — "
-            "and note that the best seed for sparking a good debate is not always "
-            "the safest answer. Judge form, not which side is 'right'.\n\n"
-            f"REFINED PROMPT:\n{refined_prompt}\n\n"
-            f"ANSWER A ({self.debaters['A'].role}):\n{ans_a}\n\n"
-            f"ANSWER B ({self.debaters['B'].role}):\n{ans_b}"
-        )
+        if self.config.mode == "build":
+            user = (
+                "Both models independently drafted an initial answer. Pick the "
+                "stronger one to be the STARTING DRAFT of the shared answer that both "
+                "will build on and refine. Choose the best foundation: the most "
+                "comprehensive, well-structured, and complete draft — the one that "
+                "gives the most to build on. Judge the draft, not which side is "
+                "'right'.\n\n"
+                f"REFINED PROMPT:\n{refined_prompt}\n\n"
+                f"ANSWER A:\n{ans_a}\n\nANSWER B:\n{ans_b}"
+            )
+        else:
+            user = (
+                "Both debaters answered the refined prompt independently. Pick the "
+                "stronger answer to SEED the sequential debate (the other model will "
+                "respond to it). Judge by comprehensiveness, clarity, and relevance — "
+                "and note that the best seed for sparking a good debate is not always "
+                "the safest answer. Judge form, not which side is 'right'.\n\n"
+                f"REFINED PROMPT:\n{refined_prompt}\n\n"
+                f"ANSWER A ({self.debaters['A'].role}):\n{ans_a}\n\n"
+                f"ANSWER B ({self.debaters['B'].role}):\n{ans_b}"
+            )
         data = self.orch.complete_json(
             self.system, user, _SEED_SCHEMA, self.config.orchestrator_max_tokens
         )
