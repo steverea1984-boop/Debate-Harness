@@ -1,5 +1,11 @@
 # Debate-Harness
 
+> **⚠️ Project concluded (2026-06-21).** Rigorous experiments showed that, for strong
+> modern models, this harness does **not** produce better answers than a single model
+> — and adversarial debate can make them worse. See **[POSTMORTEM.md](POSTMORTEM.md)**
+> for the full findings, model-performance data, and lessons. The code below remains
+> as a working reference implementation.
+
 A harness that orchestrates a **staged, sequential debate between two AI models**
 to produce better answers than either model would give alone. One model argues as
 the **proposer**, the other as the **skeptic**; an **orchestrator** referees —
